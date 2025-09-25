@@ -120,13 +120,13 @@ function calculateWanderForce(fish, time) {
 function updateFishSimulation(dt) {
   if (!world.fishes || !world.fishes.length) return;
   
-  const bobberTarget = clamp(world.bobberDist, 30, 200);
+  const bobberTarget = clamp(world.bobberDist, window.MIN_SINK_DISTANCE ?? 30, 200);
   const velocitySmooth = 1 - Math.pow(0.001, dt * 9);
   const bobberPos = { x: 0, y: bobberTarget };
   
   for (const fish of world.fishes) {
     if (!fish || fish.finished) continue;
-    
+
     // 필수 속성 초기화
     if (!fish.position) fish.position = { x: 0, y: fish.distance ?? 30 };
     if (!fish.velocity) fish.velocity = { x: 0, y: 0 };
@@ -210,8 +210,9 @@ function updateFishSimulation(dt) {
     let clamped = false;
     if (fish.position.y < 30) { fish.position.y = 30; clamped = true; }
     if (fish.position.y > 200) { fish.position.y = 200; clamped = true; }
-    if (fish.position.x < -52) { fish.position.x = -52; clamped = true; }
-    if (fish.position.x > 52) { fish.position.x = 52; clamped = true; }
+    const lateralLimit = Math.max(1, world.lateralLimit || 5);
+    if (fish.position.x < -lateralLimit) { fish.position.x = -lateralLimit; clamped = true; }
+    if (fish.position.x > lateralLimit) { fish.position.x = lateralLimit; clamped = true; }
     
     if (clamped) {
       fish.targetVelocity.x *= -0.3;
