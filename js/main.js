@@ -19,6 +19,9 @@
     window.distanceEl = document.getElementById('distance');
     window.minimap = document.getElementById('minimap');
     window.mmbar = document.getElementById('mmbar');
+    window.mmCells = document.getElementById('mmcells');
+    window.mmViewport = document.getElementById('mmviewport');
+    window.mmIndicator = document.getElementById('mmbobber');
     window.results = document.getElementById('results');
     window.rTitle = document.getElementById('rTitle');
     window.rBody = document.getElementById('rBody');
@@ -340,7 +343,7 @@
     resetTargetCircle();
     clearCatchSimulations();
     updateDistanceReadout();
-    if (window.minimap) window.minimap.style.display = 'block';
+    if (window.minimap) window.minimap.style.display = 'flex';
     if (window.distanceEl) window.distanceEl.style.display = 'block';
     setCastPrompt(true, 'Press the Screen to cast the bobber');
     resetCharacterToIdle();
@@ -591,13 +594,29 @@
     window.setHUD();
 
     window.rTitle.textContent = `Catch ${window.resultsIndex + 1}/${count}`;
+    const escapeHtml = value => String(value ?? '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+    const escapeAttr = value => escapeHtml(value).replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+    const fishImages = fish.spec?.images || {};
+    const accentColor = escapeAttr(fish.spec?.ui?.mapColorHex || '#6fffe9');
+    const imageSrc = (fish.image && fish.image.src) || fishImages.card || fishImages.illustration || fishImages.sprite || '';
+    const altText = fish.spec?.displayName ? `${fish.spec.displayName} illustration` : 'Caught fish illustration';
+    const safeAlt = escapeAttr(altText);
+    const safeName = escapeHtml(fish.spec.displayName || 'Mystery Fish');
+    const safeRarity = escapeHtml(fish.spec.rarity || 'Unknown');
+    const visual = imageSrc
+      ? `<img src="${escapeAttr(imageSrc)}" alt="${safeAlt}" loading="lazy" />`
+      : '<div class="placeholder" aria-hidden="true"></div>';
+
     window.rBody.innerHTML = `
-      <div style="margin: 20px 0;">
-        <h4 style="color: ${fish.spec.ui.mapColorHex}; margin-bottom: 10px;">${fish.spec.displayName}</h4>
-        <p><strong>Size:</strong> ${fish.size_cm.toFixed(1)} cm</p>
-        <p><strong>Weight:</strong> ${fish.weight_kg.toFixed(2)} kg</p>
-        <p><strong>Rarity:</strong> ${fish.spec.rarity}</p>
-        <p><strong>Points:</strong> ${points}</p>
+      <div class="catch-visual">
+        ${visual}
+        <div>
+          <h4 style="color: ${accentColor}; margin-bottom: 10px;">${safeName}</h4>
+          <p><strong>Size:</strong> ${fish.size_cm.toFixed(1)} cm</p>
+          <p><strong>Weight:</strong> ${fish.weight_kg.toFixed(2)} kg</p>
+          <p><strong>Rarity:</strong> ${safeRarity}</p>
+          <p><strong>Points:</strong> ${points}</p>
+        </div>
       </div>
     `;
     window.rNext.textContent = window.resultsIndex < count - 1 ? 'Next' : 'Continue';
@@ -643,52 +662,135 @@
     window.ctx.restore();
   }
 
-  function updateMinimap() {
-    if (!window.mmbar) return;
-    window.mmbar.innerHTML = '<div class="mmcenter"></div>';
-    if (window.state !== window.GameState.Targeting || !window.world.bobberVisible) return;
+  function ensureMinimapStructure() {
+    if (!window.mmbar) return null;
+    if (!window.mmCells) {
+      const existingCells = window.mmbar.querySelector('.mmcells');
+      if (existingCells) {
+        window.mmCells = existingCells;
+      } else {
+        const cells = document.createElement('div');
+        cells.className = 'mmcells';
+        window.mmbar.appendChild(cells);
+        window.mmCells = cells;
+      }
+    }
+    if (!window.mmViewport) {
+      const existingViewport = window.mmbar.querySelector('.mmviewport');
+      if (existingViewport) {
+        window.mmViewport = existingViewport;
+      } else {
+        const viewport = document.createElement('div');
+        viewport.className = 'mmviewport';
+        window.mmbar.appendChild(viewport);
+        window.mmViewport = viewport;
+      }
+    }
+    if (!window.mmIndicator) {
+      const existingIndicator = window.mmbar.querySelector('.mmbobber');
+      if (existingIndicator) {
+        window.mmIndicator = existingIndicator;
+      } else {
+        const indicator = document.createElement('div');
+        indicator.className = 'mmbobber';
+        window.mmbar.appendChild(indicator);
+        window.mmIndicator = indicator;
+      }
+    }
+    return window.mmCells;
+  }
 
-    const mapWidth = 120;
-    const mapHeight = 60;
-    const lateralRange = Math.max(1, window.world.displayRange || window.world.lateralLimit || WORLD_HALF_WIDTH);
+  function clearMinimap() {
+    const cells = ensureMinimapStructure();
+    if (cells) cells.innerHTML = '';
+    if (window.mmViewport) window.mmViewport.style.opacity = '0';
+    if (window.mmIndicator) window.mmIndicator.style.opacity = '0';
+  }
+
+  function updateMinimap(metrics = window.latestMetrics) {
+    if (!window.mmbar || !window.minimap) return;
+    const cells = ensureMinimapStructure();
+    if (!cells) return;
+
+    if (window.state !== window.GameState.Targeting) {
+      clearMinimap();
+      return;
+    }
+
+    if (!Array.isArray(window.world.fishes) || !window.world.fishes.length) {
+      clearMinimap();
+      return;
+    }
+
+    if (window.minimap.style.display !== 'flex') {
+      window.minimap.style.display = 'flex';
+    }
+
+    const minDist = window.MIN_CAST_DISTANCE ?? 0;
+    const maxDist = window.MAX_CAST_DISTANCE ?? (window.settings?.maxCast ?? minDist + 1);
+    const range = Math.max(1, maxDist - minDist);
+    const segments = Math.max(8, window.MINIMAP_SEGMENTS ?? 48);
+
+    const counts = new Array(segments).fill(0);
+    const engagedCounts = new Array(segments).fill(0);
 
     for (const fish of window.world.fishes) {
       if (!fish || fish.finished) continue;
-      const fishX = fish.position?.x ?? 0;
-      const fishY = fish.position?.y ?? fish.distance;
-      const dx = fishX;
-      const dy = fishY - window.world.bobberDist;
-      const distance = Math.sqrt(dx * dx + dy * dy);
-      if (distance <= window.DETECTION_RANGE_M) {
-        const dot = document.createElement('div');
-        dot.style.position = 'absolute';
-        dot.style.width = fish.engaged ? '6px' : '4px';
-        dot.style.height = fish.engaged ? '6px' : '4px';
-        dot.style.backgroundColor = fish.iconColor;
-        dot.style.borderRadius = '50%';
-        dot.style.left = (mapWidth * 0.5 + (fishX / lateralRange) * mapWidth * 0.45) + 'px';
-        dot.style.top = (mapHeight * 0.5 + (dy / window.DETECTION_RANGE_M) * mapHeight * 0.45) + 'px';
-        dot.style.transform = 'translate(-50%, -50%)';
-        if (fish.engaged) {
-          dot.style.border = '1px solid white';
-        }
-        window.mmbar.appendChild(dot);
-      }
+      const dist = clamp(fish.position?.y ?? fish.distance ?? minDist, minDist, maxDist);
+      const ratio = (dist - minDist) / range;
+      const index = Math.min(segments - 1, Math.max(0, Math.floor(ratio * segments)));
+      counts[index] += 1;
+      if (fish.engaged) engagedCounts[index] += 1;
     }
 
-    const rangeCircle = document.createElement('div');
-    rangeCircle.style.position = 'absolute';
-    rangeCircle.style.left = '50%';
-    rangeCircle.style.top = '50%';
-    rangeCircle.style.transform = 'translate(-50%, -50%)';
-    const baseSize = Math.min(mapWidth, mapHeight) * 0.9;
-    const circleSize = baseSize * Math.min(1, window.DETECTION_RANGE_M / lateralRange);
-    rangeCircle.style.width = circleSize + 'px';
-    rangeCircle.style.height = circleSize + 'px';
-    rangeCircle.style.border = '1px solid rgba(91, 192, 190, 0.5)';
-    rangeCircle.style.borderRadius = '50%';
-    rangeCircle.style.pointerEvents = 'none';
-    window.mmbar.appendChild(rangeCircle);
+    const maxCount = counts.reduce((max, value) => Math.max(max, value), 0);
+    cells.innerHTML = '';
+
+    const fragment = document.createDocumentFragment();
+    for (let i = segments - 1; i >= 0; i--) {
+      const cell = document.createElement('div');
+      cell.className = 'mmcell';
+      const intensity = maxCount > 0 ? counts[i] / maxCount : 0;
+      const hue = 205 - intensity * 70;
+      const lightness = 18 + intensity * 45;
+      cell.style.background = `hsl(${hue}, 82%, ${lightness}%)`;
+      if (engagedCounts[i] > 0) {
+        cell.style.boxShadow = 'inset 0 0 6px rgba(111, 255, 233, 0.55)';
+      }
+      fragment.appendChild(cell);
+    }
+    cells.appendChild(fragment);
+
+    const barHeight = window.mmbar.clientHeight || window.minimap.clientHeight;
+    const metricsRef = metrics || window.latestMetrics;
+
+    if (window.mmViewport && barHeight > 0 && metricsRef && window.canvas) {
+      const pxPerMeter = metricsRef.pxPerMeter || (window.canvas.height / Math.max(1, window.settings.maxCast));
+      const farMeters = clamp((metricsRef.waterSurfaceY + window.camera.y) / pxPerMeter, minDist, maxDist);
+      const nearMeters = clamp((metricsRef.waterSurfaceY + window.camera.y - window.canvas.height) / pxPerMeter, minDist, maxDist);
+      const farRatio = clamp((farMeters - minDist) / range, 0, 1);
+      const nearRatio = clamp((nearMeters - minDist) / range, 0, 1);
+      const topPx = (1 - farRatio) * barHeight;
+      const bottomPx = (1 - nearRatio) * barHeight;
+      const top = Math.min(topPx, bottomPx);
+      const bottom = Math.max(topPx, bottomPx);
+      const height = Math.max(6, bottom - top);
+      window.mmViewport.style.top = `${top}px`;
+      window.mmViewport.style.height = `${height}px`;
+      window.mmViewport.style.opacity = '1';
+    } else if (window.mmViewport) {
+      window.mmViewport.style.opacity = '0';
+    }
+
+    if (window.mmIndicator && barHeight > 0 && window.world.bobberVisible) {
+      const bobberMeters = clamp(window.world.bobberDist, minDist, maxDist);
+      const bobberRatio = clamp((bobberMeters - minDist) / range, 0, 1);
+      const pos = (1 - bobberRatio) * barHeight;
+      window.mmIndicator.style.top = `${pos}px`;
+      window.mmIndicator.style.opacity = '1';
+    } else if (window.mmIndicator) {
+      window.mmIndicator.style.opacity = '0';
+    }
   }
 
   function render() {
@@ -697,6 +799,7 @@
     const W = window.canvas.width;
     const H = window.canvas.height;
     const metrics = getEnvironmentMetrics(W, H);
+    window.latestMetrics = metrics;
     const distancePx = window.world.bobberDist * metrics.pxPerMeter;
     const bobberWorldY = metrics.waterSurfaceY - distancePx;
     const bobberScreenY = bobberWorldY + window.camera.y;
@@ -825,8 +928,9 @@
     render();
     if (window.state === window.GameState.Targeting) {
       updateMinimap();
-    } else if (window.mmbar) {
-      window.mmbar.innerHTML = '<div class="mmcenter"></div>';
+    } else {
+      clearMinimap();
+      if (window.minimap) window.minimap.style.display = 'none';
     }
     requestAnimationFrame(gameLoop);
   }

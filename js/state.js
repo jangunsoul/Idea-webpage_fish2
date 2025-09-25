@@ -37,6 +37,8 @@ window.FISH_SEPARATION_FORCE = 0.9;
 window.FISH_COHESION_FORCE = 0.65;
 window.FISH_ALIGNMENT_FORCE = 0.45;
 window.FISH_WANDER_FORCE = 0.55;
+window.FISH_CENTERING_FORCE = 0.35;
+window.MINIMAP_SEGMENTS = 48;
 
 window.loadingPromise = null;
 window.assetPrepPromise = null;
@@ -62,6 +64,9 @@ window.missEffect = null;
 window.distanceEl = null;
 window.minimap = null;
 window.mmbar = null;
+window.mmCells = null;
+window.mmViewport = null;
+window.mmIndicator = null;
 window.results = null;
 window.rTitle = null;
 window.rBody = null;
@@ -150,4 +155,5 @@ window.characterSprite = {
 };
 
 window.globalTime = 0;
+window.latestMetrics = null;
 

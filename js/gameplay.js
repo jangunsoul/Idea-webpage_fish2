@@ -21,7 +21,18 @@ function spawnFishes(dist, options = {}) {
   const fishes = [];
   const minDistance = 30;
   const maxDistance = spread ? 200 : Math.min(dist + 20, 200);
-  const density = spread ? randi(12, 18) : randi(6, 10);
+  const density = spread ? randi(24, 32) : randi(12, 18);
+
+  const sampleDistance = () => {
+    const r = (Math.random() + Math.random()) * 0.5;
+    return clamp(minDistance + r * (maxDistance - minDistance), minDistance, maxDistance);
+  };
+
+  const sampleLateral = () => {
+    const direction = Math.random() < 0.5 ? -1 : 1;
+    const magnitude = Math.pow(Math.random(), 1.8);
+    return clamp(direction * halfWidth * magnitude * 0.85, -halfWidth, halfWidth);
+  };
 
   for (let i = 0; i < density; i++) {
     const spec = sampleSpecies();
@@ -29,8 +40,8 @@ function spawnFishes(dist, options = {}) {
 
     const size = rand(spec.size_cm.min, spec.size_cm.max);
     const weight = rand(spec.weight_kg.min, spec.weight_kg.max);
-    const distance = rand(minDistance, maxDistance);
-    const lateral = rand(-halfWidth, halfWidth);
+    const distance = sampleDistance();
+    const lateral = sampleLateral();
 
     const fishMap = gameData?.resources?.fish;
     const cachedImage = fishMap?.get?.(spec.id);

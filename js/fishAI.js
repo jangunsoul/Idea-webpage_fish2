@@ -177,10 +177,15 @@ function updateFishSimulation(dt) {
       
       finalX += avoidanceForce.x * avoidanceWeight;
       finalY += avoidanceForce.y * avoidanceWeight;
-      
+
       finalX += wanderForce.x * FISH_WANDER_FORCE * wanderWeight;
       finalY += wanderForce.y * FISH_WANDER_FORCE * wanderWeight;
-      
+
+      const lateralSpan = Math.max(1, world.lateralLimit || 5);
+      const centerStrength = (window.FISH_CENTERING_FORCE ?? 0.35) * (fish.personalityFactor ?? 1);
+      const normalizedX = clamp(fish.position.x / lateralSpan, -1, 1);
+      finalX += -normalizedX * centerStrength * (1.2 + Math.abs(normalizedX) * 1.1);
+
       // 속도 정규화 및 적용
       const magnitude = Math.sqrt(finalX * finalX + finalY * finalY);
       if (magnitude > 0.1) {
@@ -212,13 +217,23 @@ function updateFishSimulation(dt) {
     
     // 경계 처리
     let clamped = false;
+    let horizontalBounce = false;
     if (fish.position.y < 30) { fish.position.y = 30; clamped = true; }
     if (fish.position.y > 200) { fish.position.y = 200; clamped = true; }
     const lateralLimit = Math.max(1, world.lateralLimit || 5);
-    if (fish.position.x < -lateralLimit) { fish.position.x = -lateralLimit; clamped = true; }
-    if (fish.position.x > lateralLimit) { fish.position.x = lateralLimit; clamped = true; }
-    
-    if (clamped) {
+    if (fish.position.x < -lateralLimit) { fish.position.x = -lateralLimit; clamped = true; horizontalBounce = true; }
+    if (fish.position.x > lateralLimit) { fish.position.x = lateralLimit; clamped = true; horizontalBounce = true; }
+
+    if (horizontalBounce) {
+      const direction = fish.position.x > 0 ? -1 : 1;
+      const desiredSpeed = Math.max(Math.abs(fish.targetVelocity.x), fish.swimSpeed || 6) * 0.9;
+      const speed = Math.max(3, desiredSpeed);
+      fish.targetVelocity.x = direction * speed;
+      fish.velocity.x = fish.targetVelocity.x;
+      fish.moving = true;
+    }
+
+    if (clamped && !horizontalBounce) {
       fish.targetVelocity.x *= -0.3;
       fish.targetVelocity.y *= -0.3;
     }
