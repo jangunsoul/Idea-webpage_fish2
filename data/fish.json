@@ -1,0 +1,459 @@
+{
+  "species": [
+    {
+      "id": "carp",
+      "displayName": "Common Carp",
+      "rarity": "Common",
+      "size_cm": {
+        "min": 35,
+        "max": 80
+      },
+      "weight_kg": {
+        "min": 1.0,
+        "max": 7.0
+      },
+      "basePoints": 60,
+      "ui": {
+        "mapColorHex": "#8BC34A",
+        "silhouette": "M"
+      },
+      "behavior": {
+        "swimSpeed": "Slow",
+        "pathing": "Meander",
+        "approachBias": 0.55,
+        "circleShrinkRate": 0.9,
+        "aggroRange_m": 18
+      },
+      "equipment": {
+        "recRodTier": 1,
+        "recLineTier": 1,
+        "breakRef_kg": 5
+      },
+      "scoring": {
+        "rarityMult": 1.0,
+        "weightExp": 1.2,
+        "sizeExp": 0.8,
+        "distanceBonusCap": 1.15
+      },
+      "images": {
+        "illustration": "assets/fish/carp.png"
+      }
+    },
+    {
+      "id": "trout",
+      "displayName": "River Trout",
+      "rarity": "Uncommon",
+      "size_cm": {
+        "min": 25,
+        "max": 60
+      },
+      "weight_kg": {
+        "min": 0.5,
+        "max": 3.0
+      },
+      "basePoints": 85,
+      "ui": {
+        "mapColorHex": "#00BCD4",
+        "silhouette": "S"
+      },
+      "behavior": {
+        "swimSpeed": "Fast",
+        "pathing": "Dart",
+        "approachBias": 0.45,
+        "circleShrinkRate": 1.1,
+        "aggroRange_m": 16
+      },
+      "equipment": {
+        "recRodTier": 1,
+        "recLineTier": 1,
+        "breakRef_kg": 3.5
+      },
+      "scoring": {
+        "rarityMult": 1.15,
+        "weightExp": 1.25,
+        "sizeExp": 0.9,
+        "distanceBonusCap": 1.18
+      },
+      "images": {
+        "illustration": "assets/fish/trout.png"
+      }
+    },
+    {
+      "id": "catfish",
+      "displayName": "Channel Catfish",
+      "rarity": "Uncommon",
+      "size_cm": {
+        "min": 40,
+        "max": 100
+      },
+      "weight_kg": {
+        "min": 1.5,
+        "max": 12.0
+      },
+      "basePoints": 110,
+      "ui": {
+        "mapColorHex": "#795548",
+        "silhouette": "M"
+      },
+      "behavior": {
+        "swimSpeed": "Normal",
+        "pathing": "DeepCruise",
+        "approachBias": 0.5,
+        "circleShrinkRate": 1.0,
+        "aggroRange_m": 20
+      },
+      "equipment": {
+        "recRodTier": 2,
+        "recLineTier": 2,
+        "breakRef_kg": 7
+      },
+      "scoring": {
+        "rarityMult": 1.2,
+        "weightExp": 1.3,
+        "sizeExp": 0.9,
+        "distanceBonusCap": 1.15
+      },
+      "images": {
+        "illustration": "assets/fish/catfish.png"
+      }
+    },
+    {
+      "id": "pike",
+      "displayName": "Northern Pike",
+      "rarity": "Rare",
+      "size_cm": {
+        "min": 50,
+        "max": 120
+      },
+      "weight_kg": {
+        "min": 2.0,
+        "max": 14.0
+      },
+      "basePoints": 160,
+      "ui": {
+        "mapColorHex": "#4CAF50",
+        "silhouette": "L"
+      },
+      "behavior": {
+        "swimSpeed": "Fast",
+        "pathing": "Dart",
+        "approachBias": 0.4,
+        "circleShrinkRate": 1.2,
+        "aggroRange_m": 18
+      },
+      "equipment": {
+        "recRodTier": 2,
+        "recLineTier": 2,
+        "breakRef_kg": 8
+      },
+      "scoring": {
+        "rarityMult": 1.35,
+        "weightExp": 1.35,
+        "sizeExp": 1.0,
+        "distanceBonusCap": 1.2
+      },
+      "images": {
+        "illustration": "assets/fish/pike.png"
+      }
+    },
+    {
+      "id": "bass",
+      "displayName": "Largemouth Bass",
+      "rarity": "Uncommon",
+      "size_cm": {
+        "min": 30,
+        "max": 70
+      },
+      "weight_kg": {
+        "min": 0.7,
+        "max": 5.0
+      },
+      "basePoints": 95,
+      "ui": {
+        "mapColorHex": "#9C27B0",
+        "silhouette": "M"
+      },
+      "behavior": {
+        "swimSpeed": "Normal",
+        "pathing": "Meander",
+        "approachBias": 0.6,
+        "circleShrinkRate": 1.0,
+        "aggroRange_m": 17
+      },
+      "equipment": {
+        "recRodTier": 1,
+        "recLineTier": 1,
+        "breakRef_kg": 4.5
+      },
+      "scoring": {
+        "rarityMult": 1.15,
+        "weightExp": 1.25,
+        "sizeExp": 0.9,
+        "distanceBonusCap": 1.16
+      },
+      "images": {
+        "illustration": "assets/fish/bass.png"
+      }
+    },
+    {
+      "id": "salmon",
+      "displayName": "Coho Salmon",
+      "rarity": "Rare",
+      "size_cm": {
+        "min": 55,
+        "max": 90
+      },
+      "weight_kg": {
+        "min": 2.0,
+        "max": 8.0
+      },
+      "basePoints": 170,
+      "ui": {
+        "mapColorHex": "#F44336",
+        "silhouette": "M"
+      },
+      "behavior": {
+        "swimSpeed": "Fast",
+        "pathing": "Dart",
+        "approachBias": 0.42,
+        "circleShrinkRate": 1.15,
+        "aggroRange_m": 18
+      },
+      "equipment": {
+        "recRodTier": 2,
+        "recLineTier": 2,
+        "breakRef_kg": 6.5
+      },
+      "scoring": {
+        "rarityMult": 1.35,
+        "weightExp": 1.35,
+        "sizeExp": 1.0,
+        "distanceBonusCap": 1.2
+      },
+      "images": {
+        "illustration": "assets/fish/salmon.png"
+      }
+    },
+    {
+      "id": "koi_golden",
+      "displayName": "Golden Koi",
+      "rarity": "Epic",
+      "size_cm": {
+        "min": 35,
+        "max": 75
+      },
+      "weight_kg": {
+        "min": 1.0,
+        "max": 6.0
+      },
+      "basePoints": 240,
+      "ui": {
+        "mapColorHex": "#FFC107",
+        "silhouette": "M"
+      },
+      "behavior": {
+        "swimSpeed": "Slow",
+        "pathing": "Meander",
+        "approachBias": 0.35,
+        "circleShrinkRate": 1.0,
+        "aggroRange_m": 15
+      },
+      "equipment": {
+        "recRodTier": 2,
+        "recLineTier": 2,
+        "breakRef_kg": 6
+      },
+      "scoring": {
+        "rarityMult": 1.6,
+        "weightExp": 1.3,
+        "sizeExp": 1.1,
+        "distanceBonusCap": 1.18
+      },
+      "images": {
+        "illustration": "assets/fish/koi_golden.png"
+      }
+    },
+    {
+      "id": "sturgeon",
+      "displayName": "River Sturgeon",
+      "rarity": "Legendary",
+      "size_cm": {
+        "min": 80,
+        "max": 180
+      },
+      "weight_kg": {
+        "min": 6.0,
+        "max": 40.0
+      },
+      "basePoints": 420,
+      "ui": {
+        "mapColorHex": "#607D8B",
+        "silhouette": "L"
+      },
+      "behavior": {
+        "swimSpeed": "Normal",
+        "pathing": "DeepCruise",
+        "approachBias": 0.3,
+        "circleShrinkRate": 1.25,
+        "aggroRange_m": 22
+      },
+      "equipment": {
+        "recRodTier": 3,
+        "recLineTier": 3,
+        "breakRef_kg": 18
+      },
+      "scoring": {
+        "rarityMult": 2.1,
+        "weightExp": 1.45,
+        "sizeExp": 1.1,
+        "distanceBonusCap": 1.2
+      },
+      "images": {
+        "illustration": "assets/fish/sturgeon.png"
+      }
+    },
+    {
+      "id": "eel_electric",
+      "displayName": "Electric Eel",
+      "rarity": "Rare",
+      "size_cm": {
+        "min": 60,
+        "max": 120
+      },
+      "weight_kg": {
+        "min": 3.0,
+        "max": 22.0
+      },
+      "basePoints": 210,
+      "ui": {
+        "mapColorHex": "#3F51B5",
+        "silhouette": "L"
+      },
+      "behavior": {
+        "swimSpeed": "Fast",
+        "pathing": "Dart",
+        "approachBias": 0.38,
+        "circleShrinkRate": 1.2,
+        "aggroRange_m": 20
+      },
+      "equipment": {
+        "recRodTier": 3,
+        "recLineTier": 3,
+        "breakRef_kg": 12
+      },
+      "scoring": {
+        "rarityMult": 1.4,
+        "weightExp": 1.4,
+        "sizeExp": 1.0,
+        "distanceBonusCap": 1.19
+      },
+      "images": {
+        "illustration": "assets/fish/eel_electric.png"
+      }
+    },
+    {
+      "id": "arapaima",
+      "displayName": "Arapaima (Jackpot)",
+      "rarity": "Mythic",
+      "size_cm": {
+        "min": 150,
+        "max": 250
+      },
+      "weight_kg": {
+        "min": 40.0,
+        "max": 180.0
+      },
+      "basePoints": 950,
+      "ui": {
+        "mapColorHex": "#FF5722",
+        "silhouette": "L"
+      },
+      "behavior": {
+        "swimSpeed": "Normal",
+        "pathing": "DeepCruise",
+        "approachBias": 0.2,
+        "circleShrinkRate": 1.3,
+        "aggroRange_m": 24
+      },
+      "equipment": {
+        "recRodTier": 4,
+        "recLineTier": 4,
+        "breakRef_kg": 40
+      },
+      "scoring": {
+        "rarityMult": 3.5,
+        "weightExp": 1.6,
+        "sizeExp": 1.2,
+        "distanceBonusCap": 1.2
+      },
+      "images": {
+        "illustration": "assets/fish/arapaima.png"
+      }
+    }
+  ],
+  "assets": {
+    "fish": "assets/fish/",
+    "characters": "assets/characters/",
+    "ui": {
+      "star": "assets/characters/star.png"
+    }
+  },
+  "characters": [
+    {
+      "id": "champion_angler",
+      "displayName": "Championship Angler",
+      "role": "Player",
+      "description": "Ready to cast straight up the river in search of legendary fish.",
+      "images": {
+        "spriteSheet": "assets/characters/char.png"
+      },
+      "animation": {
+        "frameWidth": 40,
+        "frameHeight": 40,
+        "frameCount": 4,
+        "idleFrame": 0,
+        "postCastFrame": 3,
+        "castSequence": [
+          0,
+          1,
+          2,
+          3
+        ],
+        "frameDurationMs": 120,
+        "scale": 2.4,
+        "lineAnchor": {
+          "x": 30,
+          "y": 18
+        }
+      }
+    }
+  ],
+  "environment": {
+    "tileWidth": 40,
+    "tileHeight": 40,
+    "landRows": 3,
+    "waterTile": "assets/characters/river.png",
+    "shoreTile": "assets/characters/land01.png",
+    "landTile": "assets/characters/land02.png"
+  },
+  "player": {
+    "spriteSheet": "assets/characters/char.png",
+    "frameWidth": 40,
+    "frameHeight": 40,
+    "frameCount": 4,
+    "idleFrame": 0,
+    "postCastFrame": 3,
+    "castSequence": [
+      0,
+      1,
+      2,
+      3
+    ],
+    "frameDurationMs": 120,
+    "scale": 2.4,
+    "lineAnchor": {
+      "x": 30,
+      "y": 18
+    }
+  }
+}

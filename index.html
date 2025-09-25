@@ -1,0 +1,72 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Reel 'Em All! – Prototype</title>
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <div id="game">
+    <canvas id="view" aria-label="game view"></canvas>
+    
+    <div class="hud">
+      <div class="left">
+        <div class="pill">⚡ Energy: <span id="energy">10</span></div>
+      </div>
+      <div class="right">
+        <div class="pill">🎣 Points: <span id="points">0</span></div>
+      </div>
+    </div>
+
+    <div class="center-title" id="title">
+      <div class="title">Reel 'Em All!</div>
+      <div class="subtitle">릴럼올! – Touch to Start</div>
+      <div class="tap" id="startBtn">Touch to Start</div>
+    </div>
+
+    <div class="version-tag" id="versionTag" aria-hidden="true">Version v0.5.0-improved</div>
+
+    <div class="gauge" id="gauge">
+      <div class="panel">
+        <h3>Cast Power</h3>
+        <div class="bar" id="bar">
+          <div class="sweet" id="sweet"></div>
+          <div class="cursor" id="cursor"></div>
+        </div>
+        <div class="hint">Stop the cursor in the <b style="color:#ff8b8b">red</b> zone. Closer to the center = farther cast.</div>
+        <div class="tap tapto">Tap / Click to Stop</div>
+      </div>
+    </div>
+
+    <div class="toast" id="toast"></div>
+    <div class="miss-effect" id="missEffect">MISS!</div>
+    <div class="distance" id="distance"></div>
+
+    <div class="minimap" id="minimap">
+      <h4>Mini‑map (Detection Range)</h4>
+      <div class="mmbar" id="mmbar"><div class="mmcenter"></div></div>
+    </div>
+
+    <div class="modal" id="results">
+      <div class="card">
+        <h3 id="rTitle">Catch Results</h3>
+        <div id="rBody"></div>
+        <div class="actions">
+          <div class="btn" id="rSkip">Skip</div>
+          <div class="btn primary" id="rNext">Next</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 스크립트 파일들을 순서대로 로드 -->
+  <script src="js/utils.js"></script>
+  <script src="js/constants.js"></script>
+  <script src="js/gameState.js"></script>
+  <script src="js/fishAI.js"></script>
+  <script src="js/rendering.js"></script>
+  <script src="js/gameplay.js"></script>
+  <script src="js/main.js"></script>
+</body>
+</html>
