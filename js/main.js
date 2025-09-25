@@ -6,7 +6,13 @@
     window.canvas = document.getElementById('view');
     window.ctx = window.canvas?.getContext('2d') ?? null;
     window.startBtn = document.getElementById('startBtn');
-    window.title = document.getElementById('title');
+    window.mainMenu = document.getElementById('mainMenu');
+    window.titleBar = document.getElementById('titleBar');
+    window.navBar = document.getElementById('navBar');
+    window.exitBtn = document.getElementById('exitBtn');
+    window.shopBtn = document.getElementById('shopBtn');
+    window.rankBtn = document.getElementById('rankBtn');
+    window.premiumBtn = document.getElementById('premiumBtn');
     window.castPrompt = document.getElementById('castPrompt');
     window.toastEl = document.getElementById('toast');
     window.missEffect = document.getElementById('missEffect');
@@ -21,7 +27,7 @@
     window.energyEl = document.getElementById('energy');
     window.pointsEl = document.getElementById('points');
 
-    if (!window.canvas || !window.ctx || !window.startBtn) {
+    if (!window.canvas || !window.ctx || !window.startBtn || !window.mainMenu) {
       throw new Error('Essential DOM elements are missing.');
     }
   }
@@ -282,27 +288,79 @@
     window.distanceEl.textContent = `Distance: ${Math.round(window.world.bobberDist)}m`;
   }
 
-  function startPlaySession() {
-    window.setGameplayLayout(true);
-    window.camera.y = 0;
-    window.settings.energy = Math.max(0, window.settings.energy - 1);
-    window.setHUD();
-    window.title.style.display = 'none';
-    window.state = window.GameState.Targeting;
-    window.world.actives = [];
-    window.world.catches = [];
-    window.world.time = 0;
-    window.world.targetZoom = 1;
-    window.world.viewZoom = 1;
-    resetTargetCircle();
-    updateDistanceReadout();
-    if (window.minimap) window.minimap.style.display = 'block';
-    const metrics = getEnvironmentMetrics(window.canvas.clientWidth, window.canvas.clientHeight);
+  function respawnFishPopulation() {
     const spawnInfo = spawnFishes(window.settings.maxCast, { spread: true, halfWidth: WORLD_HALF_WIDTH });
     window.world.fishes = spawnInfo.fishes;
     window.world.lateralLimit = spawnInfo.lateralLimit;
     window.world.displayRange = spawnInfo.displayRange;
+  }
+
+  function preparePlayRound(respawn = true) {
+    window.state = window.GameState.Targeting;
+    window.camera.y = 0;
+    window.world.actives = [];
+    window.world.catches = [];
+    window.world.pendingCatchSims = [];
+    window.resultsIndex = 0;
+    window.world.time = 0;
+    window.world.targetZoom = 1;
+    window.world.viewZoom = 1;
+    window.world.bobberVisible = false;
+    if (respawn || !Array.isArray(window.world.fishes) || !window.world.fishes.length) {
+      respawnFishPopulation();
+    } else {
+      for (const fish of window.world.fishes) {
+        if (!fish) continue;
+        fish.finished = false;
+        fish.engaged = false;
+        fish.active = null;
+        fish.escapeTimer = 0;
+      }
+    }
+    resetTargetCircle();
+    clearCatchSimulations();
+    updateDistanceReadout();
+    if (window.minimap) window.minimap.style.display = 'block';
+    if (window.distanceEl) window.distanceEl.style.display = 'block';
     setCastPrompt(true, 'Press the Screen to cast the bobber');
+    resetCharacterToIdle();
+  }
+
+  function exitToMenu() {
+    window.state = window.GameState.Idle;
+    window.camera.y = 0;
+    setCastPrompt(false);
+    awardRemainingCatchPoints();
+    window.world.targetCircle = null;
+    window.world.actives = [];
+    window.world.catches = [];
+    window.world.fishes = [];
+    window.world.targetZoom = 1;
+    window.world.viewZoom = 1;
+    window.world.bobberDist = TARGET_MIN_DISTANCE;
+    window.world.castDistance = TARGET_MIN_DISTANCE;
+    window.world.castStage = 'idle';
+    window.world.bobberVisible = false;
+    window.world.sinkTimer = 0;
+    window.world.sinkDuration = 0;
+    window.world.sinkStartDist = TARGET_MIN_DISTANCE;
+    window.world.sinkEndDist = TARGET_MIN_DISTANCE;
+    window.world.pendingCatchSims = [];
+    clearCatchSimulations();
+    window.resultsIndex = 0;
+    if (window.results) window.results.style.display = 'none';
+    if (window.minimap) window.minimap.style.display = 'none';
+    if (window.distanceEl) window.distanceEl.style.display = 'none';
+    resetCharacterToIdle();
+    window.setGameplayLayout(false);
+    updateDistanceReadout();
+  }
+
+  function startPlaySession() {
+    window.setGameplayLayout(true);
+    window.settings.energy = Math.max(0, window.settings.energy - 1);
+    window.setHUD();
+    preparePlayRound(true);
   }
 
   function updateTargeting(dt) {
@@ -471,9 +529,7 @@
     if (!anyActive) {
       window.toast('Miss – no fish bit the bobber.');
     }
-    if (window.minimap) window.minimap.style.display = 'none';
-    if (window.distanceEl) window.distanceEl.style.display = 'none';
-    resetToIdle();
+    preparePlayRound(true);
   }
 
   function handlePointerUp() {
@@ -485,31 +541,6 @@
     target.velocity = 0;
     window.world.targetZoom = 1;
     beginSinkPhase();
-  }
-
-  function resetToIdle() {
-    window.state = window.GameState.Idle;
-    window.title.style.display = 'flex';
-    setCastPrompt(false);
-    window.world.targetCircle = null;
-    window.world.actives = [];
-    window.world.catches = [];
-    window.world.targetZoom = 1;
-    window.world.viewZoom = 1;
-    window.world.bobberDist = TARGET_MIN_DISTANCE;
-    window.world.castDistance = TARGET_MIN_DISTANCE;
-    window.world.castStage = 'idle';
-    window.world.bobberVisible = false;
-    window.world.sinkTimer = 0;
-    window.world.sinkDuration = 0;
-    window.world.sinkStartDist = TARGET_MIN_DISTANCE;
-    window.world.sinkEndDist = TARGET_MIN_DISTANCE;
-    clearCatchSimulations();
-    window.resultsIndex = 0;
-    if (window.minimap) window.minimap.style.display = 'none';
-    resetCharacterToIdle();
-    window.setGameplayLayout(false);
-    updateDistanceReadout();
   }
 
   function showResults() {
@@ -550,6 +581,28 @@
       </div>
     `;
     window.rNext.textContent = window.resultsIndex < count - 1 ? 'Next' : 'Continue';
+  }
+
+  function awardRemainingCatchPoints() {
+    if (!Array.isArray(window.world.catches) || !window.world.catches.length) return;
+    let bonus = 0;
+    for (let i = window.resultsIndex + 1; i < window.world.catches.length; i++) {
+      const fish = window.world.catches[i];
+      if (!fish) continue;
+      const points = computePoints(fish, window.world.castDistance);
+      window.settings.points += points;
+      bonus += points;
+    }
+    if (bonus > 0) {
+      window.setHUD();
+    }
+  }
+
+  function closeResultsToContinue() {
+    awardRemainingCatchPoints();
+    if (window.results) window.results.style.display = 'none';
+    window.resultsIndex = 0;
+    preparePlayRound(true);
   }
 
   function drawTargetCircle(x, y) {
@@ -791,15 +844,23 @@
       if (window.resultsIndex < window.world.catches.length) {
         renderResultCard();
       } else {
-        window.results.style.display = 'none';
-        resetToIdle();
+        closeResultsToContinue();
       }
     });
 
     window.rSkip.addEventListener('click', () => {
-      window.results.style.display = 'none';
-      resetToIdle();
+      closeResultsToContinue();
     });
+
+    const comingSoon = label => () => window.toast(`${label} – Coming Soon`);
+    if (window.shopBtn) window.shopBtn.addEventListener('click', comingSoon('Shop'));
+    if (window.rankBtn) window.rankBtn.addEventListener('click', comingSoon('Ranking'));
+    if (window.premiumBtn) window.premiumBtn.addEventListener('click', comingSoon('Premium Mode'));
+    if (window.exitBtn) {
+      window.exitBtn.addEventListener('click', () => {
+        exitToMenu();
+      });
+    }
   }
 
   async function initGame() {

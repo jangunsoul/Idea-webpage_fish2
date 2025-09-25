@@ -64,20 +64,23 @@ window.setHUD = function setHUD() {
 };
 
 window.setGameplayLayout = function setGameplayLayout(active) {
-  if (!window.canvas || !window.title || !window.distanceEl) return;
+  if (!window.canvas) return;
+  const menu = window.mainMenu;
+  const nav = window.navBar;
+  const exitBtn = window.exitBtn;
   if (active) {
-    window.title.style.display = 'none';
+    if (menu) menu.style.display = 'none';
+    if (nav) nav.style.display = 'none';
+    if (exitBtn) exitBtn.style.display = 'block';
     window.canvas.style.cursor = 'crosshair';
-    window.distanceEl.style.display = 'block';
-    const hud = document.querySelector('.hud');
-    if (hud) hud.style.display = 'flex';
+    if (window.distanceEl) window.distanceEl.style.display = 'block';
   } else {
-    window.title.style.display = 'flex';
+    if (menu) menu.style.display = 'flex';
+    if (nav) nav.style.display = 'flex';
+    if (exitBtn) exitBtn.style.display = 'none';
     window.canvas.style.cursor = 'default';
-    window.distanceEl.style.display = 'none';
+    if (window.distanceEl) window.distanceEl.style.display = 'none';
     if (window.minimap) window.minimap.style.display = 'none';
-    const hud = document.querySelector('.hud');
-    if (hud) hud.style.display = 'none';
   }
 };
 
