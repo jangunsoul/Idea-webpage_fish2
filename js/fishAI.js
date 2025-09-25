@@ -120,13 +120,13 @@ function calculateWanderForce(fish, time) {
 function updateFishSimulation(dt) {
   if (!world.fishes || !world.fishes.length) return;
   
-  const bobberTarget = clamp(world.bobberDist, 30, 200);
+  const bobberTarget = clamp(world.bobberDist, window.MIN_SINK_DISTANCE ?? 30, 200);
   const velocitySmooth = 1 - Math.pow(0.001, dt * 9);
   const bobberPos = { x: 0, y: bobberTarget };
   
   for (const fish of world.fishes) {
     if (!fish || fish.finished) continue;
-    
+
     // 필수 속성 초기화
     if (!fish.position) fish.position = { x: 0, y: fish.distance ?? 30 };
     if (!fish.velocity) fish.velocity = { x: 0, y: 0 };
@@ -201,7 +201,11 @@ function updateFishSimulation(dt) {
     // 속도 스무딩
     fish.velocity.x += (fish.targetVelocity.x - fish.velocity.x) * velocitySmooth;
     fish.velocity.y += (fish.targetVelocity.y - fish.velocity.y) * velocitySmooth;
-    
+
+    if (Math.abs(fish.velocity.x) > 0.05) {
+      fish.facingRight = fish.velocity.x > 0;
+    }
+
     // 위치 업데이트
     fish.position.x += fish.velocity.x * dt;
     fish.position.y += fish.velocity.y * dt;
@@ -210,8 +214,9 @@ function updateFishSimulation(dt) {
     let clamped = false;
     if (fish.position.y < 30) { fish.position.y = 30; clamped = true; }
     if (fish.position.y > 200) { fish.position.y = 200; clamped = true; }
-    if (fish.position.x < -52) { fish.position.x = -52; clamped = true; }
-    if (fish.position.x > 52) { fish.position.x = 52; clamped = true; }
+    const lateralLimit = Math.max(1, world.lateralLimit || 5);
+    if (fish.position.x < -lateralLimit) { fish.position.x = -lateralLimit; clamped = true; }
+    if (fish.position.x > lateralLimit) { fish.position.x = lateralLimit; clamped = true; }
     
     if (clamped) {
       fish.targetVelocity.x *= -0.3;
