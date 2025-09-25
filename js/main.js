@@ -214,36 +214,56 @@
     const count = Math.min(18, Math.max(8, entries.length * 2));
     window.passingSchool = Array.from({ length: count }, (_, i) => {
       const [id, img] = entries[i % entries.length];
+      const lane = (i + Math.random() * 0.8 + 0.2) / (count + 0.4);
+      const baseX = Math.min(0.95, Math.max(0.05, lane));
+      const baseY = 0.18 + Math.random() * 0.64;
+      const xDrift = 0.08 + Math.random() * 0.25;
+      const yDrift = 0.08 + Math.random() * 0.22;
       return {
         id,
         img,
         scale: 0.55 + Math.random() * 0.45,
-        baseX: Math.random(),
-        baseY: Math.random(),
-        xAmp: 0.35 + Math.random() * 0.4,
-        yAmp: 0.25 + Math.random() * 0.35,
-        xSpeed: 0.6 + Math.random() * 1.0,
-        ySpeed: 0.45 + Math.random() * 0.85,
+        baseX,
+        baseY,
+        xAmp: xDrift,
+        yAmp: yDrift,
+        xSpeed: 0.35 + Math.random() * 0.85,
+        ySpeed: 0.3 + Math.random() * 0.65,
         phaseX: Math.random() * Math.PI * 2,
         phaseY: Math.random() * Math.PI * 2
       };
     });
   }
 
-  function drawPassingSchool(W, H) {
+  function drawPassingSchool(W, H, metrics) {
     if (!window.passingSchool.length || !window.ctx) return;
     const time = window.globalTime;
-    const baseY = H * 0.4;
+    const waterTop = Math.max(20, (metrics?.topMargin || H * 0.2) * 0.45);
+    const waterBottom = Math.max(waterTop + 80, (metrics?.shorelineY ?? H * 0.8) - (metrics?.tileH ?? 40) * 0.5);
+    const waterHeight = waterBottom - waterTop;
+    const lateralMargin = W * 0.08;
+    const usableWidth = Math.max(40, W - lateralMargin * 2);
     for (const fish of window.passingSchool) {
-      const x = W * (fish.baseX + Math.sin(time * fish.xSpeed + fish.phaseX) * fish.xAmp * 0.2);
-      const y = baseY + Math.sin(time * fish.ySpeed + fish.phaseY) * fish.yAmp * 120;
+      const sinX = Math.sin(time * fish.xSpeed + fish.phaseX);
+      const sinY = Math.sin(time * fish.ySpeed + fish.phaseY);
+      const centerX = lateralMargin + usableWidth * (fish.baseX ?? 0.5);
+      const offsetX = sinX * (fish.xAmp ?? 0.1) * usableWidth * 0.5;
+      const x = centerX + offsetX;
+      const centerY = waterTop + waterHeight * (fish.baseY ?? 0.5);
+      const offsetY = sinY * (fish.yAmp ?? 0.1) * waterHeight * 0.5;
+      const y = centerY + offsetY;
       const img = fish.img;
+      if (!img) continue;
       const scale = fish.scale * 0.7;
       const width = img.width * scale;
       const height = img.height * scale;
+      const dir = Math.cos(time * fish.xSpeed + fish.phaseX) * fish.xSpeed;
+      const facingRight = dir > 0;
       window.ctx.save();
       window.ctx.globalAlpha = 0.55;
-      window.ctx.drawImage(img, x - width / 2, y - height / 2, width, height);
+      window.ctx.translate(x, y);
+      if (facingRight) window.ctx.scale(-1, 1);
+      window.ctx.drawImage(img, -width / 2, -height / 2, width, height);
       window.ctx.restore();
     }
   }
@@ -701,7 +721,7 @@
 
     drawEnvironment(W, H, metrics, window.camera.y);
     if (window.state === window.GameState.Idle) {
-      drawPassingSchool(W, H);
+      drawPassingSchool(W, H, metrics);
     }
     drawCharacterSprite(W, H, metrics, window.camera.y);
 
@@ -729,7 +749,16 @@
           const fishScale = 0.75;
           const fishW = fishImage.width * fishScale;
           const fishH = fishImage.height * fishScale;
-          window.ctx.drawImage(fishImage, fishScreenX - fishW / 2, fishScreenY - fishH / 2, fishW, fishH);
+          const facingRight = !!fish.facingRight;
+          if (facingRight) {
+            window.ctx.save();
+            window.ctx.translate(fishScreenX, fishScreenY);
+            window.ctx.scale(-1, 1);
+            window.ctx.drawImage(fishImage, -fishW / 2, -fishH / 2, fishW, fishH);
+            window.ctx.restore();
+          } else {
+            window.ctx.drawImage(fishImage, fishScreenX - fishW / 2, fishScreenY - fishH / 2, fishW, fishH);
+          }
         } else {
           const fishSize = 10;
           window.ctx.fillStyle = fish.iconColor;

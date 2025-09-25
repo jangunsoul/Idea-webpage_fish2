@@ -41,6 +41,7 @@ function spawnFishes(dist, options = {}) {
       velocity: { x: 0, y: 0 }, targetVelocity: { x: 0, y: 0 }, bonusMultiplier: 1,
       escapeTimer: 0, lastCircleTime: -Infinity, renderCache: null, image: cachedImage || null, active: null,
       stressLevel: 0, personalityFactor: rand(0.8, 1.2), moveBias: getFishMoveBias(spec),
+      facingRight: Math.random() > 0.5,
       swimSpeed: getFishSwimSpeed(spec, weight)
     };
     fishes.push(fish);

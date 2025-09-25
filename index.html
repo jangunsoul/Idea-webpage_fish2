@@ -51,13 +51,14 @@
 
     .hud {
       position: absolute;
-      top: 20px;
+      top: clamp(96px, 20vh, 150px);
       width: 100%;
       display: flex;
       justify-content: space-between;
       padding: 0 20px;
       pointer-events: none;
-      z-index: 20;
+      z-index: 35;
+      transition: top 0.6s cubic-bezier(0.22, 1, 0.36, 1);
     }
 
     .pill {
@@ -75,13 +76,29 @@
       top: 0;
       left: 0;
       width: 100%;
-      padding: 18px 24px;
+      padding: 18px 24px 80px;
       background: linear-gradient(135deg, rgba(91, 192, 190, 0.12), rgba(63, 81, 181, 0.28));
       backdrop-filter: blur(14px);
       border-bottom: 1px solid rgba(255, 255, 255, 0.08);
       display: flex;
       justify-content: center;
       z-index: 30;
+      overflow: visible;
+      transform: translateY(0);
+      transition: transform 0.6s cubic-bezier(0.22, 1, 0.36, 1), opacity 0.6s ease;
+    }
+
+    #titleBar::after {
+      content: '';
+      position: absolute;
+      left: 0;
+      right: 0;
+      bottom: -90px;
+      height: 160px;
+      background: linear-gradient(180deg, rgba(15, 23, 42, 0.72), rgba(15, 23, 42, 0));
+      pointer-events: none;
+      z-index: -1;
+      transition: opacity 0.6s ease;
     }
 
     #titleBar h1 {
@@ -108,6 +125,7 @@
       text-align: center;
       color: var(--text);
       z-index: 25;
+      transition: transform 0.6s cubic-bezier(0.22, 1, 0.36, 1), opacity 0.4s ease;
     }
 
     #mainMenu p {
@@ -158,6 +176,7 @@
       justify-content: space-between;
       padding: 0 24px;
       z-index: 25;
+      transition: transform 0.5s cubic-bezier(0.22, 1, 0.36, 1), opacity 0.4s ease;
     }
 
     .nav-btn {
@@ -197,8 +216,10 @@
       border: 1px solid rgba(255, 255, 255, 0.12);
       cursor: pointer;
       z-index: 40;
-      display: none;
-      transition: all 0.25s ease;
+      opacity: 0;
+      pointer-events: none;
+      transform: translateY(16px);
+      transition: opacity 0.35s ease, transform 0.35s ease;
     }
 
     #exitBtn:hover {
@@ -217,7 +238,7 @@
 
     .cast-prompt {
       position: absolute;
-      top: 50%;
+      top: 75%;
       left: 50%;
       transform: translate(-50%, -50%);
       background: rgba(0, 0, 0, 0.78);
@@ -239,6 +260,38 @@
 
     .cast-prompt.show {
       opacity: 1;
+    }
+
+    #game.gameplay #titleBar {
+      transform: translateY(-140%);
+      opacity: 0;
+      pointer-events: none;
+    }
+
+    #game.gameplay #titleBar::after {
+      opacity: 0;
+    }
+
+    #game.gameplay .hud {
+      top: 22px;
+    }
+
+    #game.gameplay #mainMenu {
+      opacity: 0;
+      transform: translateY(40px);
+      pointer-events: none;
+    }
+
+    #game.gameplay .bottom-nav {
+      opacity: 0;
+      transform: translateY(30px);
+      pointer-events: none;
+    }
+
+    #game.gameplay #exitBtn {
+      opacity: 1;
+      pointer-events: auto;
+      transform: translateY(0);
     }
 
     .toast {
@@ -427,7 +480,8 @@
 
     <button id="exitBtn" type="button">Exit</button>
 
-    <div class="version-tag" id="versionTag" aria-hidden="true">Version v0.7.0-improved</div>
+    <div class="version-tag" id="versionTag" aria-hidden="true">Version v0.5.0-improved</div>
+
     <div class="toast" id="toast"></div>
     <div class="miss-effect" id="missEffect">MISS!</div>
     <div class="distance" id="distance"></div>

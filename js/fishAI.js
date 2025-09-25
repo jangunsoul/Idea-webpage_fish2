@@ -201,7 +201,11 @@ function updateFishSimulation(dt) {
     // 속도 스무딩
     fish.velocity.x += (fish.targetVelocity.x - fish.velocity.x) * velocitySmooth;
     fish.velocity.y += (fish.targetVelocity.y - fish.velocity.y) * velocitySmooth;
-    
+
+    if (Math.abs(fish.velocity.x) > 0.05) {
+      fish.facingRight = fish.velocity.x > 0;
+    }
+
     // 위치 업데이트
     fish.position.x += fish.velocity.x * dt;
     fish.position.y += fish.velocity.y * dt;

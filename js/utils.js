@@ -64,23 +64,35 @@ window.setHUD = function setHUD() {
 };
 
 window.setGameplayLayout = function setGameplayLayout(active) {
-  if (!window.canvas) return;
-  const menu = window.mainMenu;
-  const nav = window.navBar;
-  const exitBtn = window.exitBtn;
-  if (active) {
-    if (menu) menu.style.display = 'none';
-    if (nav) nav.style.display = 'none';
-    if (exitBtn) exitBtn.style.display = 'block';
-    window.canvas.style.cursor = 'crosshair';
-    if (window.distanceEl) window.distanceEl.style.display = 'block';
-  } else {
-    if (menu) menu.style.display = 'flex';
-    if (nav) nav.style.display = 'flex';
-    if (exitBtn) exitBtn.style.display = 'none';
-    window.canvas.style.cursor = 'default';
-    if (window.distanceEl) window.distanceEl.style.display = 'none';
-    if (window.minimap) window.minimap.style.display = 'none';
+  const container = document.getElementById('game');
+  if (container) container.classList.toggle('gameplay', !!active);
+
+  if (window.canvas) {
+    window.canvas.style.cursor = active ? 'crosshair' : 'default';
+  }
+
+  if (window.distanceEl) {
+    window.distanceEl.style.display = active ? 'block' : 'none';
+  }
+
+  if (!active && window.minimap) {
+    window.minimap.style.display = 'none';
+  }
+
+  if (window.mainMenu) {
+    window.mainMenu.setAttribute('aria-hidden', active ? 'true' : 'false');
+  }
+
+  if (window.navBar) {
+    window.navBar.setAttribute('aria-hidden', active ? 'true' : 'false');
+    window.navBar.querySelectorAll('button').forEach(btn => {
+      btn.tabIndex = active ? -1 : 0;
+    });
+  }
+
+  if (window.exitBtn) {
+    window.exitBtn.setAttribute('aria-hidden', active ? 'false' : 'true');
+    window.exitBtn.tabIndex = active ? 0 : -1;
   }
 };
 
