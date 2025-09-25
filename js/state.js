@@ -4,6 +4,10 @@
 
 window.DATA_URL = './data/fish.json';
 
+window.MIN_CAST_DISTANCE = 30;
+window.MAX_CAST_DISTANCE = 200;
+window.MIN_SINK_DISTANCE = 24;
+
 window.GameState = {
   Idle: 'Idle',
   Targeting: 'Targeting',
@@ -88,6 +92,8 @@ window.settings = {
 window.world = {
   castDistance: 0,
   bobberDist: 0,
+  castStage: 'idle',
+  bobberVisible: false,
   fishes: [],
   actives: [],
   catches: [],
@@ -96,7 +102,12 @@ window.world = {
   displayRange: 5,
   targetCircle: null,
   viewZoom: 1,
-  targetZoom: 1
+  targetZoom: 1,
+  sinkTimer: 0,
+  sinkDuration: 0,
+  sinkStartDist: 0,
+  sinkEndDist: 0,
+  pendingCatchSims: []
 };
 
 window.camera = { y: 0 };

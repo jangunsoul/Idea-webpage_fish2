@@ -120,7 +120,7 @@ function calculateWanderForce(fish, time) {
 function updateFishSimulation(dt) {
   if (!world.fishes || !world.fishes.length) return;
   
-  const bobberTarget = clamp(world.bobberDist, 30, 200);
+  const bobberTarget = clamp(world.bobberDist, window.MIN_SINK_DISTANCE ?? 30, 200);
   const velocitySmooth = 1 - Math.pow(0.001, dt * 9);
   const bobberPos = { x: 0, y: bobberTarget };
   

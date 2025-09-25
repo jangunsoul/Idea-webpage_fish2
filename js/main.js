@@ -242,13 +242,19 @@
     }
   }
 
-  const TARGET_MIN_DISTANCE = 30;
+  const TARGET_MIN_DISTANCE = window.MIN_CAST_DISTANCE ?? 30;
   const TARGET_MAX_DISTANCE = 150;
-  const TARGET_SPEED_BASE = 220;
+  const TARGET_SPEED_BASE = 22;
+  const SINK_DURATION = 3;
+  const SINK_DISTANCE_DROP = 12;
+  const SINK_MIN_DISTANCE = window.MIN_SINK_DISTANCE ?? TARGET_MIN_DISTANCE * 0.8;
   const WORLD_HALF_WIDTH = 5;
 
-  function setCastPrompt(visible) {
+  function setCastPrompt(visible, message) {
     if (!window.castPrompt) return;
+    if (typeof message === 'string') {
+      window.castPrompt.textContent = message;
+    }
     window.castPrompt.classList.toggle('show', !!visible);
   }
 
@@ -260,8 +266,15 @@
       holdTime: 0,
       reachedTop: false
     };
+    window.world.castStage = 'aiming';
+    window.world.bobberVisible = false;
     window.world.bobberDist = TARGET_MIN_DISTANCE;
     window.world.castDistance = TARGET_MIN_DISTANCE;
+    window.world.sinkTimer = 0;
+    window.world.sinkDuration = 0;
+    window.world.sinkStartDist = TARGET_MIN_DISTANCE;
+    window.world.sinkEndDist = TARGET_MIN_DISTANCE;
+    window.world.pendingCatchSims = [];
   }
 
   function updateDistanceReadout() {
@@ -289,10 +302,11 @@
     window.world.fishes = spawnInfo.fishes;
     window.world.lateralLimit = spawnInfo.lateralLimit;
     window.world.displayRange = spawnInfo.displayRange;
-    setCastPrompt(true);
+    setCastPrompt(true, 'Press the Screen to cast the bobber');
   }
 
   function updateTargeting(dt) {
+    if (window.world.castStage !== 'aiming') return;
     const target = window.world.targetCircle;
     if (!target) return;
     if (target.holding) {
@@ -317,6 +331,7 @@
 
   function handlePointerDown() {
     if (window.state !== window.GameState.Targeting) return;
+    if (window.world.castStage !== 'aiming') return;
     const target = window.world.targetCircle;
     if (!target) return;
     target.holding = true;
@@ -327,14 +342,113 @@
     startCharacterCastAnimation();
   }
 
-  function attemptCatch() {
-    const actives = Array.isArray(window.world.actives) ? window.world.actives.slice() : [];
-    const anyActive = actives.some(a => a && a.fish && !a.fish.finished);
-    const caughtNow = [];
+  function clearCatchSimulations() {
+    window.world.pendingCatchSims = [];
+  }
+
+  function beginSinkPhase() {
+    if (window.world.castStage !== 'aiming') return;
+    const target = window.world.targetCircle;
+    if (!target) return;
+    window.world.castStage = 'sinking';
+    window.world.bobberVisible = true;
+    window.world.sinkTimer = 0;
+    window.world.sinkDuration = SINK_DURATION;
+    window.world.sinkStartDist = target.distance;
+    const dropTarget = target.distance - SINK_DISTANCE_DROP;
+    window.world.sinkEndDist = window.clamp(dropTarget, SINK_MIN_DISTANCE, target.distance);
+    window.world.bobberDist = target.distance;
+    window.world.castDistance = target.distance;
+    clearCatchSimulations();
+    window.world.targetCircle = null;
+    setCastPrompt(true, 'Pull!');
+    updateDistanceReadout();
+  }
+
+  function updateCatchSimulations(dt) {
+    if (!Array.isArray(window.world.pendingCatchSims)) {
+      window.world.pendingCatchSims = [];
+    }
+    const sims = window.world.pendingCatchSims;
+    const actives = Array.isArray(window.world.actives) ? window.world.actives : [];
+
     for (const active of actives) {
       if (!active || !active.fish) continue;
-      if (rollCatch(active)) {
-        const fish = active.fish;
+      let sim = sims.find(entry => entry.fish === active.fish);
+      if (!sim) {
+        sim = {
+          fish: active.fish,
+          active,
+          successes: 0,
+          failures: 0,
+          timer: window.rand(0, 0.2),
+          interval: window.rand(0.25, 0.55),
+          lastOutcome: null
+        };
+        sims.push(sim);
+      }
+      sim.active = active;
+      sim.timer += dt;
+      while (sim.timer >= sim.interval) {
+        sim.timer -= sim.interval;
+        const success = rollCatch(active);
+        if (success) {
+          sim.successes += 1;
+        } else {
+          sim.failures += 1;
+        }
+        sim.lastOutcome = success;
+        sim.interval = window.rand(0.25, 0.55);
+      }
+    }
+
+    window.world.pendingCatchSims = sims.filter(sim => actives.includes(sim.active));
+  }
+
+  function updateSinkPhase(dt) {
+    if (window.world.castStage !== 'sinking') return;
+    const duration = window.world.sinkDuration || SINK_DURATION;
+    window.world.sinkTimer += dt;
+    const t = window.clamp(duration > 0 ? window.world.sinkTimer / duration : 1, 0, 1);
+    const eased = t * t * (3 - 2 * t);
+    const nextDist = window.lerp(window.world.sinkStartDist, window.world.sinkEndDist, eased);
+    window.world.bobberDist = window.clamp(nextDist, SINK_MIN_DISTANCE, TARGET_MAX_DISTANCE);
+    updateDistanceReadout();
+    updateCatchSimulations(dt);
+    if (window.world.sinkTimer >= duration) {
+      finalizeCatchAttempt();
+    }
+  }
+
+  function finalizeCatchAttempt() {
+    if (window.world.castStage === 'resolved') return;
+    window.world.castStage = 'resolved';
+    setCastPrompt(false);
+    const actives = Array.isArray(window.world.actives) ? window.world.actives.slice() : [];
+    const sims = Array.isArray(window.world.pendingCatchSims) ? window.world.pendingCatchSims : [];
+    const caughtNow = [];
+    let anyActive = false;
+
+    for (const active of actives) {
+      if (!active || !active.fish) continue;
+      anyActive = true;
+      const fish = active.fish;
+      const sim = sims.find(entry => entry.fish === fish) || null;
+      let success = false;
+      if (sim) {
+        const totalChecks = sim.successes + sim.failures;
+        if (totalChecks === 0) {
+          success = rollCatch(active);
+        } else if (sim.successes === sim.failures) {
+          success = sim.lastOutcome ?? rollCatch(active);
+        } else {
+          success = sim.successes > sim.failures;
+        }
+      } else {
+        success = rollCatch(active);
+      }
+
+      if (success) {
         fish.finished = true;
         fish.engaged = false;
         if (fish.active) fish.active = null;
@@ -343,30 +457,34 @@
       }
       releaseActiveCircle(active, false);
     }
+
     window.world.actives = [];
+    clearCatchSimulations();
+    window.world.bobberVisible = false;
+
     if (caughtNow.length) {
       showResults();
-    } else {
-      window.showMissEffect();
-      if (!anyActive) {
-        window.toast('Miss – no fish bit the bobber.');
-      }
-      window.world.targetCircle = null;
-      if (window.minimap) window.minimap.style.display = 'none';
-      if (window.distanceEl) window.distanceEl.style.display = 'none';
-      setCastPrompt(false);
-      resetToIdle();
+      return;
     }
+
+    window.showMissEffect();
+    if (!anyActive) {
+      window.toast('Miss – no fish bit the bobber.');
+    }
+    if (window.minimap) window.minimap.style.display = 'none';
+    if (window.distanceEl) window.distanceEl.style.display = 'none';
+    resetToIdle();
   }
 
   function handlePointerUp() {
     if (window.state !== window.GameState.Targeting) return;
+    if (window.world.castStage !== 'aiming') return;
     const target = window.world.targetCircle;
     if (!target || !target.holding) return;
     target.holding = false;
     target.velocity = 0;
     window.world.targetZoom = 1;
-    attemptCatch();
+    beginSinkPhase();
   }
 
   function resetToIdle() {
@@ -380,6 +498,13 @@
     window.world.viewZoom = 1;
     window.world.bobberDist = TARGET_MIN_DISTANCE;
     window.world.castDistance = TARGET_MIN_DISTANCE;
+    window.world.castStage = 'idle';
+    window.world.bobberVisible = false;
+    window.world.sinkTimer = 0;
+    window.world.sinkDuration = 0;
+    window.world.sinkStartDist = TARGET_MIN_DISTANCE;
+    window.world.sinkEndDist = TARGET_MIN_DISTANCE;
+    clearCatchSimulations();
     window.resultsIndex = 0;
     if (window.minimap) window.minimap.style.display = 'none';
     resetCharacterToIdle();
@@ -389,6 +514,8 @@
 
   function showResults() {
     window.state = window.GameState.Results;
+    window.world.castStage = 'idle';
+    window.world.bobberVisible = false;
     window.resultsIndex = 0;
     window.results.style.display = 'flex';
     if (window.minimap) window.minimap.style.display = 'none';
@@ -446,7 +573,7 @@
   function updateMinimap() {
     if (!window.mmbar) return;
     window.mmbar.innerHTML = '<div class="mmcenter"></div>';
-    if (window.state !== window.GameState.Targeting) return;
+    if (window.state !== window.GameState.Targeting || !window.world.bobberVisible) return;
 
     const mapWidth = 120;
     const mapHeight = 60;
@@ -502,6 +629,12 @@
     const bobberScreenY = bobberWorldY + window.camera.y;
     const bobberX = W * 0.5 + metrics.bobberOffsetX;
     const lateralScale = (W * 0.82) / (Math.max(1, window.world.lateralLimit || WORLD_HALF_WIDTH) * 2);
+    let targetCircleScreenY = bobberScreenY;
+    if (window.world.targetCircle) {
+      const circlePx = window.world.targetCircle.distance * metrics.pxPerMeter;
+      const circleWorldY = metrics.waterSurfaceY - circlePx;
+      targetCircleScreenY = circleWorldY + window.camera.y;
+    }
 
     window.ctx.clearRect(0, 0, W, H);
 
@@ -520,10 +653,12 @@
     drawCharacterSprite(W, H, metrics, window.camera.y);
 
     if (window.state === window.GameState.Targeting) {
-      const hasTarget = !!window.world.targetCircle;
-      if (hasTarget) {
+      const stage = window.world.castStage;
+      if (stage === 'aiming' && window.world.targetCircle) {
+        drawTargetCircle(bobberX, targetCircleScreenY);
+      }
+      if (window.world.bobberVisible) {
         drawFishingLine(window.rodAnchor.x, window.rodAnchor.y, bobberX, bobberScreenY);
-        drawTargetCircle(bobberX, bobberScreenY);
         drawBobber(bobberX, bobberScreenY);
       }
 
@@ -564,7 +699,7 @@
         }
       }
 
-      if (hasTarget) {
+      if (window.world.bobberVisible) {
         const dt = window.world.lastFrameDt ?? 1 / 60;
         updateActiveCircles(dt, bobberX, bobberScreenY, metrics, window.camera.y);
       }
@@ -592,7 +727,11 @@
 
     const metrics = getEnvironmentMetrics(window.canvas.width, window.canvas.height);
     if (window.state === window.GameState.Targeting) {
-      updateTargeting(dt);
+      if (window.world.castStage === 'aiming') {
+        updateTargeting(dt);
+      } else if (window.world.castStage === 'sinking') {
+        updateSinkPhase(dt);
+      }
     }
     updateCamera(window.world.bobberDist, metrics, dt, window.state);
 
@@ -646,6 +785,7 @@
     window.addEventListener('pointerdown', handlePointerDown);
     window.addEventListener('pointerup', handlePointerUp);
     window.addEventListener('pointercancel', handlePointerUp);
+
     window.rNext.addEventListener('click', () => {
       window.resultsIndex++;
       if (window.resultsIndex < window.world.catches.length) {

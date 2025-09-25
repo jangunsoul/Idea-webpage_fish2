@@ -136,21 +136,24 @@
 
     .cast-prompt {
       position: absolute;
-      bottom: 40px;
+      top: 50%;
       left: 50%;
-      transform: translateX(-50%);
-      background: rgba(0, 0, 0, 0.8);
-      padding: 12px 18px;
-      border-radius: 20px;
-      font-size: 1rem;
-      font-weight: 600;
+      transform: translate(-50%, -50%);
+      background: rgba(0, 0, 0, 0.78);
+      padding: 16px 24px;
+      border-radius: 28px;
+      font-size: 1.1rem;
+      font-weight: 700;
       color: var(--secondary);
-      letter-spacing: 0.02em;
+      letter-spacing: 0.04em;
       text-align: center;
-      z-index: 25;
+      z-index: 35;
       opacity: 0;
       pointer-events: none;
       transition: opacity 0.3s ease;
+      max-width: 80%;
+      line-height: 1.4;
+      box-shadow: 0 10px 35px rgba(17, 24, 39, 0.55);
     }
 
     .cast-prompt.show {
@@ -332,7 +335,7 @@
       <div class="tap" id="startBtn">Loading Assets...</div>
     </div>
 
-    <div class="version-tag" id="versionTag" aria-hidden="true">Version v0.5.0-improved</div>
+    <div class="version-tag" id="versionTag" aria-hidden="true">Version v0.6.0-improved</div>
 
     <div class="toast" id="toast"></div>
     <div class="miss-effect" id="missEffect">MISS!</div>
@@ -354,7 +357,7 @@
       </div>
     </div>
 
-    <div class="cast-prompt" id="castPrompt">Press the screen to cast the bobber</div>
+    <div class="cast-prompt" id="castPrompt">Press the Screen to cast the bobber</div>
   </div>
 
   
