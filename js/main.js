@@ -646,7 +646,6 @@
     window.addEventListener('pointerdown', handlePointerDown);
     window.addEventListener('pointerup', handlePointerUp);
     window.addEventListener('pointercancel', handlePointerUp);
-
     window.rNext.addEventListener('click', () => {
       window.resultsIndex++;
       if (window.resultsIndex < window.world.catches.length) {
