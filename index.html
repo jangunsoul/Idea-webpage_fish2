@@ -20,19 +20,26 @@
     }
 
     * { margin: 0; padding: 0; box-sizing: border-box; }
-    body { 
-      background: var(--bg); 
-      color: var(--text); 
+    body {
+      background: var(--bg);
+      color: var(--text);
       font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
       overflow: hidden;
-      height: 100vh;
+      min-height: 100vh;
+      display: flex;
+      justify-content: center;
+      align-items: stretch;
     }
 
     #game {
       position: relative;
-      width: 100vw;
+      width: min(420px, 100vw);
       height: 100vh;
       overflow: hidden;
+      margin: 0 auto;
+      box-shadow: 0 0 40px rgba(0, 0, 0, 0.45);
+      border-radius: 18px 18px 0 0;
+      background: #020817;
     }
 
     #view {
@@ -127,73 +134,27 @@
       opacity: 0.6;
     }
 
-    .gauge {
-      display: none;
+    .cast-prompt {
       position: absolute;
-      bottom: 20px;
+      bottom: 40px;
       left: 50%;
       transform: translateX(-50%);
-      z-index: 20;
-    }
-
-    .panel {
       background: rgba(0, 0, 0, 0.8);
-      padding: 20px;
-      border-radius: 15px;
+      padding: 12px 18px;
+      border-radius: 20px;
+      font-size: 1rem;
+      font-weight: 600;
+      color: var(--secondary);
+      letter-spacing: 0.02em;
       text-align: center;
-      backdrop-filter: blur(10px);
-      border: 1px solid rgba(255, 255, 255, 0.1);
+      z-index: 25;
+      opacity: 0;
+      pointer-events: none;
+      transition: opacity 0.3s ease;
     }
 
-    .panel h3 {
-      margin-bottom: 15px;
-      color: var(--primary);
-    }
-
-    .bar {
-      position: relative;
-      width: 300px;
-      height: 20px;
-      background: var(--bg-light);
-      border-radius: 10px;
-      overflow: hidden;
-      margin: 10px 0;
-    }
-
-    .sweet {
-      position: absolute;
-      left: 50%;
-      top: 0;
-      width: 60px;
-      height: 100%;
-      background: var(--error);
-      transform: translateX(-50%);
-      border-radius: 10px;
-    }
-
-    .cursor {
-      position: absolute;
-      top: 0;
-      width: 5px;
-      height: 100%;
-      background: var(--secondary);
-      border-radius: 2px;
-    }
-
-    .hint {
-      font-size: 0.9rem;
-      color: var(--text-dim);
-      margin: 10px 0;
-    }
-
-    .tapto {
-      background: var(--primary);
-      color: white;
-      padding: 8px 16px;
-      border-radius: 15px;
-      display: inline-block;
-      font-size: 0.9rem;
-      margin-top: 10px;
+    .cast-prompt.show {
+      opacity: 1;
     }
 
     .toast {
@@ -344,9 +305,10 @@
     }
 
     @media (max-width: 768px) {
+      body { align-items: flex-start; }
+      #game { border-radius: 0; box-shadow: none; }
       .title { font-size: 2rem; }
       .subtitle { font-size: 1rem; }
-      .bar { width: 250px; }
       .hud { padding: 0 10px; }
     }
   </style>
@@ -366,23 +328,11 @@
 
     <div class="center-title" id="title">
       <div class="title">Reel 'Em All!</div>
-      <div class="subtitle">릴럼올! – Touch to Start</div>
+      <div class="subtitle">릴럼올! – Press Game Play</div>
       <div class="tap" id="startBtn">Loading Assets...</div>
     </div>
 
     <div class="version-tag" id="versionTag" aria-hidden="true">Version v0.5.0-improved</div>
-
-    <div class="gauge" id="gauge">
-      <div class="panel">
-        <h3>Cast Power</h3>
-        <div class="bar" id="bar">
-          <div class="sweet" id="sweet"></div>
-          <div class="cursor" id="cursor"></div>
-        </div>
-        <div class="hint">Stop the cursor in the <b style="color:#ff8b8b">red</b> zone. Closer to the center = farther cast.</div>
-        <div class="tap tapto">Tap / Click to Stop</div>
-      </div>
-    </div>
 
     <div class="toast" id="toast"></div>
     <div class="miss-effect" id="missEffect">MISS!</div>
@@ -403,6 +353,8 @@
         </div>
       </div>
     </div>
+
+    <div class="cast-prompt" id="castPrompt">Press the screen to cast the bobber</div>
   </div>
 
   

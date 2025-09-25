@@ -71,14 +71,15 @@ window.setGameplayLayout = function setGameplayLayout(active) {
     window.distanceEl.style.display = 'block';
     const hud = document.querySelector('.hud');
     if (hud) hud.style.display = 'flex';
+    if (window.castPrompt) window.castPrompt.classList.add('show');
   } else {
     window.title.style.display = 'flex';
     window.canvas.style.cursor = 'default';
     window.distanceEl.style.display = 'none';
     if (window.minimap) window.minimap.style.display = 'none';
-    if (window.gauge) window.gauge.style.display = 'none';
     const hud = document.querySelector('.hud');
     if (hud) hud.style.display = 'none';
+    if (window.castPrompt) window.castPrompt.classList.remove('show');
   }
 };
 

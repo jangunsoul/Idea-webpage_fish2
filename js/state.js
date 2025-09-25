@@ -6,9 +6,7 @@ window.DATA_URL = './data/fish.json';
 
 window.GameState = {
   Idle: 'Idle',
-  Casting: 'Casting',
-  Flight: 'Flight',
-  Fishing: 'Fishing',
+  Targeting: 'Targeting',
   Results: 'Results'
 };
 
@@ -49,10 +47,6 @@ window.canvas = null;
 window.ctx = null;
 window.startBtn = null;
 window.title = null;
-window.gauge = null;
-window.bar = null;
-window.sweet = null;
-window.cursor = null;
 window.toastEl = null;
 window.missEffect = null;
 window.distanceEl = null;
@@ -65,6 +59,7 @@ window.rNext = null;
 window.rSkip = null;
 window.energyEl = null;
 window.pointsEl = null;
+window.castPrompt = null;
 
 window.gameData = {
   assets: {},
@@ -97,8 +92,11 @@ window.world = {
   actives: [],
   catches: [],
   time: 0,
-  lateralLimit: 26,
-  displayRange: 26
+  lateralLimit: 5,
+  displayRange: 5,
+  targetCircle: null,
+  viewZoom: 1,
+  targetZoom: 1
 };
 
 window.camera = { y: 0 };
