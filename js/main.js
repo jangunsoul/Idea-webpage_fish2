@@ -2,6 +2,31 @@
 // Relies on global state defined in state.js and helpers from utils.js.
 
 (function () {
+  const reelBattle = {
+    modal: null,
+    white: null,
+    marker: null,
+    fishImage: null,
+    status: null,
+    info: null,
+    nextBtn: null,
+    summaryModal: null,
+    summaryList: null,
+    summaryTotal: null,
+    summaryClose: null,
+    nextCountdownLabel: null,
+    queue: [],
+    index: -1,
+    results: [],
+    state: null,
+    totalPoints: 0,
+    redWidth: 0.22,
+    finalWhite: 0.22,
+    duration: 4.2,
+    autoAdvanceTimer: 0,
+    autoAdvanceActive: false
+  };
+
   function ensureDomReferences() {
     window.canvas = document.getElementById('view');
     window.ctx = window.canvas?.getContext('2d') ?? null;
@@ -10,6 +35,7 @@
     window.titleBar = document.getElementById('titleBar');
     window.navBar = document.getElementById('navBar');
     window.exitBtn = document.getElementById('exitBtn');
+    window.autoBtn = document.getElementById('autoBtn');
     window.shopBtn = document.getElementById('shopBtn');
     window.rankBtn = document.getElementById('rankBtn');
     window.premiumBtn = document.getElementById('premiumBtn');
@@ -29,6 +55,20 @@
     window.rSkip = document.getElementById('rSkip');
     window.energyEl = document.getElementById('energy');
     window.pointsEl = document.getElementById('points');
+    reelBattle.modal = document.getElementById('reelBattleModal');
+    reelBattle.white = document.getElementById('battleGaugeWhite');
+    reelBattle.marker = document.getElementById('battleGaugeFish');
+    reelBattle.fishImage = document.getElementById('battleFishImage');
+    reelBattle.status = document.getElementById('battleStatus');
+    reelBattle.info = document.getElementById('battleInfo');
+    reelBattle.nextBtn = document.getElementById('battleNext');
+    reelBattle.summaryModal = document.getElementById('catchSummary');
+    reelBattle.summaryList = document.getElementById('summaryList');
+    reelBattle.summaryTotal = document.getElementById('summaryTotal');
+    reelBattle.summaryClose = document.getElementById('summaryClose');
+    reelBattle.nextCountdownLabel = document.getElementById('battleNextCountdown');
+
+    updateAutoButtonUI();
 
     if (!window.canvas || !window.ctx || !window.startBtn || !window.mainMenu) {
       throw new Error('Essential DOM elements are missing.');
@@ -297,6 +337,494 @@
     window.castPrompt.classList.toggle('show', !!visible);
   }
 
+  function escapeHtml(value) {
+    return String(value ?? '')
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;')
+      .replace(/'/g, '&#39;');
+  }
+
+  function setModalVisibility(element, visible) {
+    if (!element) return;
+    element.style.display = visible ? 'flex' : 'none';
+    element.setAttribute('aria-hidden', visible ? 'false' : 'true');
+  }
+
+  function clearNextBattleCountdown() {
+    reelBattle.autoAdvanceActive = false;
+    reelBattle.autoAdvanceTimer = 0;
+    if (reelBattle.nextCountdownLabel) {
+      reelBattle.nextCountdownLabel.textContent = '';
+      reelBattle.nextCountdownLabel.classList.remove('show');
+    }
+  }
+
+  function startNextBattleCountdown() {
+    reelBattle.autoAdvanceTimer = 2;
+    reelBattle.autoAdvanceActive = true;
+    if (reelBattle.nextCountdownLabel) {
+      reelBattle.nextCountdownLabel.textContent = '2.0s';
+      reelBattle.nextCountdownLabel.classList.add('show');
+    }
+  }
+
+  function updateAutoButtonUI() {
+    if (!window.autoBtn) return;
+    const active = !!window.world.autoMode;
+    window.autoBtn.classList.toggle('active', active);
+    window.autoBtn.setAttribute('aria-pressed', active ? 'true' : 'false');
+    window.autoBtn.textContent = active ? 'Auto On' : 'Auto';
+  }
+
+  function scheduleAutoCast(delay = 0.45) {
+    if (!window.world.autoMode) return;
+    if (window.state !== window.GameState.Targeting) return;
+    if (window.world.castStage !== 'aiming') return;
+    const target = window.world.targetCircle;
+    if (!target) return;
+    window.world.autoCastTimer = Math.max(0, delay);
+    window.world.autoHoldActive = false;
+    window.world.autoReleaseDelay = window.rand(0.55, 0.85);
+    target.holding = false;
+    target.holdTime = 0;
+    target.velocity = 0;
+    setCastPrompt(true, 'Auto casting...');
+  }
+
+  function setAutoMode(enabled, schedule = true) {
+    const next = !!enabled;
+    if (window.world.autoMode === next) {
+      if (next && schedule) scheduleAutoCast(window.rand(0.3, 0.6));
+      updateAutoButtonUI();
+      return;
+    }
+    window.world.autoMode = next;
+    window.world.autoHoldActive = false;
+    if (!next) {
+      window.world.autoCastTimer = 0;
+      window.world.autoReleaseDelay = 0;
+      if (window.world.targetCircle) {
+        window.world.targetCircle.holding = false;
+      }
+      if (window.state === window.GameState.Targeting && window.world.castStage === 'aiming') {
+        setCastPrompt(true, 'Press the Screen to cast the bobber');
+      }
+    } else if (schedule) {
+      scheduleAutoCast(window.rand(0.3, 0.6));
+    }
+    updateAutoButtonUI();
+  }
+
+  function updateAutoPlay(dt) {
+    if (!window.world.autoMode) return;
+    if (window.state !== window.GameState.Targeting) return;
+    if (window.world.castStage === 'aiming') {
+      const target = window.world.targetCircle;
+      if (!target) return;
+      if (!window.world.autoHoldActive) {
+        window.world.autoCastTimer -= dt;
+        if (window.world.autoCastTimer <= 0) {
+          if (!target.holding) {
+            handlePointerDown();
+          }
+          window.world.autoHoldActive = true;
+          window.world.autoReleaseDelay = window.rand(0.6, 0.9);
+        }
+      } else {
+        const desiredDistance = TARGET_MAX_DISTANCE - 2;
+        if (target.distance >= desiredDistance || target.holdTime >= window.world.autoReleaseDelay) {
+          if (target.holding) handlePointerUp();
+          window.world.autoHoldActive = false;
+        }
+      }
+    } else if (window.world.castStage !== 'sinking') {
+      window.world.autoHoldActive = false;
+    }
+  }
+
+  function resetReelBattle(hideModals = true) {
+    reelBattle.queue = [];
+    reelBattle.index = -1;
+    reelBattle.results = [];
+    reelBattle.state = null;
+    reelBattle.totalPoints = 0;
+    clearNextBattleCountdown();
+    window.world.battleQueue = [];
+    window.world.battleResults = [];
+    window.world.currentBattleIndex = -1;
+    window.world.pendingPointTotal = 0;
+    if (hideModals) {
+      setModalVisibility(reelBattle.modal, false);
+      setModalVisibility(reelBattle.summaryModal, false);
+    }
+    if (reelBattle.status) {
+      reelBattle.status.textContent = '';
+      reelBattle.status.classList.remove('success', 'fail');
+    }
+    if (reelBattle.info) {
+      reelBattle.info.textContent = '';
+    }
+    if (reelBattle.fishImage) {
+      reelBattle.fishImage.innerHTML = '';
+      reelBattle.fishImage.classList.remove('celebrate', 'flip');
+      reelBattle.fishImage.style.transform = '';
+    }
+    if (reelBattle.white) {
+      reelBattle.white.style.left = '0%';
+      reelBattle.white.style.width = '100%';
+    }
+    if (reelBattle.marker) {
+      reelBattle.marker.style.left = '50%';
+    }
+    if (reelBattle.nextBtn) {
+      reelBattle.nextBtn.disabled = true;
+      reelBattle.nextBtn.classList.add('disabled');
+    }
+  }
+
+  function renderBattleFishArt(fish) {
+    if (!reelBattle.fishImage) return;
+    const container = reelBattle.fishImage;
+    container.innerHTML = '';
+    container.classList.remove('celebrate', 'flip');
+    container.style.transform = 'translate(-50%, -50%)';
+    if (!fish) {
+      const placeholder = document.createElement('div');
+      placeholder.className = 'placeholder';
+      container.appendChild(placeholder);
+      return;
+    }
+    const images = fish.spec?.images || {};
+    const cache = window.gameData?.resources?.fish;
+    const cachedImg = fish.image || cache?.get?.(fish.specId) || null;
+    const src = cachedImg?.src || images.card || images.illustration || images.sprite || '';
+    if (src) {
+      const img = document.createElement('img');
+      img.src = src;
+      img.alt = `${fish.spec?.displayName || 'Fish'} illustration`;
+      container.appendChild(img);
+    } else {
+      const placeholder = document.createElement('div');
+      placeholder.className = 'placeholder';
+      container.appendChild(placeholder);
+    }
+  }
+
+  function gatherFishCandidates(range) {
+    const fishes = [];
+    if (!Array.isArray(window.world.fishes)) return fishes;
+    for (const fish of window.world.fishes) {
+      if (!fish || fish.finished) continue;
+      const x = fish.position?.x ?? 0;
+      const y = fish.position?.y ?? fish.distance ?? window.world.bobberDist;
+      const dy = y - window.world.bobberDist;
+      const dist = Math.sqrt(x * x + dy * dy);
+      if (!Number.isFinite(dist)) continue;
+      if (dist <= range) {
+        fishes.push({ fish, dist });
+      }
+    }
+    fishes.sort((a, b) => a.dist - b.dist);
+    return fishes.map(entry => entry.fish);
+  }
+
+  function computeBattleChance(fish, candidateCount) {
+    const spec = fish?.spec || {};
+    let base = 0.55;
+    const rarityAdjust = {
+      Common: 0.12,
+      Uncommon: 0.05,
+      Rare: -0.02,
+      Epic: -0.08,
+      Legendary: -0.15,
+      Mythic: -0.2
+    }[spec.rarity] ?? 0;
+    base += rarityAdjust;
+    const stressFactor = window.clamp(1 - (fish?.stressLevel ?? 0) * 0.35, 0.7, 1.1);
+    base *= stressFactor;
+    const crowding = window.clamp(0.12 - (candidateCount - 1) * 0.04, -0.12, 0.18);
+    base += crowding;
+    if (fish?.bonusMultiplier > 1) {
+      base += 0.04 * (fish.bonusMultiplier - 1);
+    }
+    return window.clamp(base, 0.1, 0.92);
+  }
+
+  function startReelBattleSequence(fishes) {
+    if (!Array.isArray(fishes) || !fishes.length) return;
+    window.state = window.GameState.Results;
+    window.world.castStage = 'idle';
+    window.world.bobberVisible = false;
+    resetReelBattle(false);
+    reelBattle.queue = fishes.map(fish => {
+      const chance = computeBattleChance(fish, fishes.length);
+      return {
+        fish,
+        chance,
+        success: Math.random() < chance,
+        resolved: false,
+        points: 0
+      };
+    });
+    reelBattle.index = -1;
+    reelBattle.results = [];
+    reelBattle.totalPoints = 0;
+    reelBattle.state = null;
+    window.world.battleQueue = reelBattle.queue.map(entry => entry.fish);
+    window.world.battleResults = reelBattle.results;
+    window.world.currentBattleIndex = -1;
+    window.world.pendingPointTotal = 0;
+    if (window.results) window.results.style.display = 'none';
+    if (window.minimap) window.minimap.style.display = 'none';
+    if (window.distanceEl) window.distanceEl.style.display = 'none';
+    setCastPrompt(false);
+    beginNextReelBattle();
+  }
+
+  function beginNextReelBattle() {
+    clearNextBattleCountdown();
+    reelBattle.index += 1;
+    window.world.currentBattleIndex = reelBattle.index;
+    if (reelBattle.index >= reelBattle.queue.length) {
+      finishReelBattleSequence();
+      return;
+    }
+    setupReelBattle(reelBattle.queue[reelBattle.index]);
+  }
+
+  function setupReelBattle(candidate) {
+    if (!candidate || !candidate.fish) {
+      beginNextReelBattle();
+      return;
+    }
+    const fish = candidate.fish;
+    if (reelBattle.status) {
+      reelBattle.status.textContent = '줄을 잡아당기는 중...';
+      reelBattle.status.classList.remove('success', 'fail');
+    }
+    if (reelBattle.info) {
+      const name = fish.spec?.displayName || '알 수 없는 물고기';
+      reelBattle.info.textContent = `${name}이(가) 버티고 있습니다.`;
+    }
+    renderBattleFishArt(fish);
+    if (reelBattle.white) {
+      reelBattle.white.style.left = '0%';
+      reelBattle.white.style.width = '100%';
+    }
+    if (reelBattle.marker) {
+      reelBattle.marker.style.left = '50%';
+    }
+    if (reelBattle.nextBtn) {
+      reelBattle.nextBtn.disabled = true;
+      reelBattle.nextBtn.classList.add('disabled');
+      reelBattle.nextBtn.textContent = 'Next';
+    }
+    clearNextBattleCountdown();
+    setModalVisibility(reelBattle.modal, true);
+    reelBattle.state = {
+      candidate,
+      elapsed: 0,
+      duration: reelBattle.duration,
+      redWidth: reelBattle.redWidth,
+      finalWhite: reelBattle.finalWhite,
+      currentWidth: 1,
+      fishPos: 0.5,
+      fishDirection: -1,
+      fishPhase: Math.random() * Math.PI * 2,
+      fishSpeed: 3 + Math.random() * 1.8,
+      success: candidate.success,
+      resolved: false,
+      failTriggered: false,
+      failDirection: Math.random() > 0.5 ? 1 : -1
+    };
+  }
+
+  function resolveReelBattleOutcome(success) {
+    const state = reelBattle.state;
+    if (!state || state.resolved) return;
+    state.resolved = true;
+    const candidate = state.candidate;
+    candidate.resolved = true;
+    candidate.outcome = success;
+    const fish = candidate.fish;
+    const name = fish.spec?.displayName || 'Mystery Fish';
+    const rarity = fish.spec?.rarity || 'Unknown';
+    fish.finished = true;
+    if (reelBattle.status) {
+      reelBattle.status.textContent = success ? '성공' : '실패';
+      reelBattle.status.classList.toggle('success', success);
+      reelBattle.status.classList.toggle('fail', !success);
+    }
+    let infoHtml = '';
+    if (success) {
+      if (reelBattle.fishImage) reelBattle.fishImage.classList.add('celebrate');
+      const points = computePoints(fish, window.world.castDistance);
+      candidate.points = points;
+      reelBattle.totalPoints += points;
+      window.world.pendingPointTotal = reelBattle.totalPoints;
+      reelBattle.results.push({ fish, success: true, points });
+      if (!window.world.catches.includes(fish)) {
+        window.world.catches.push(fish);
+      }
+      infoHtml = `
+        <p><strong>${escapeHtml(name)}</strong> (${escapeHtml(rarity)})</p>
+        <p>Size: ${fish.size_cm.toFixed(1)} cm · Weight: ${fish.weight_kg.toFixed(2)} kg</p>
+        <p><strong>Points +${points}</strong></p>
+      `;
+    } else {
+      candidate.points = 0;
+      reelBattle.results.push({ fish, success: false, points: 0 });
+      infoHtml = `
+        <p><strong>${escapeHtml(name)}</strong> (${escapeHtml(rarity)})</p>
+        <p>Size: ${fish.size_cm.toFixed(1)} cm · Weight: ${fish.weight_kg.toFixed(2)} kg</p>
+        <p><strong>Points +0</strong></p>
+        <p style="margin-top:6px;">도망가 버렸어요!</p>
+      `;
+    }
+    if (reelBattle.info) {
+      reelBattle.info.innerHTML = infoHtml;
+    }
+    if (reelBattle.nextBtn) {
+      reelBattle.nextBtn.disabled = false;
+      reelBattle.nextBtn.classList.remove('disabled');
+    }
+    const hasMore = reelBattle.index < reelBattle.queue.length - 1;
+    if (hasMore) {
+      startNextBattleCountdown();
+    } else {
+      clearNextBattleCountdown();
+    }
+  }
+
+  function updateReelBattle(dt) {
+    const state = reelBattle.state;
+    if (!state || !reelBattle.modal || reelBattle.summaryModal?.style.display === 'flex') return;
+    const previousPos = state.fishPos;
+    state.elapsed = Math.min(state.elapsed + dt, state.duration + 0.6);
+    const t = window.clamp(state.elapsed / state.duration, 0, 1);
+    const eased = t * t * (3 - 2 * t);
+    const currentWidth = window.lerp(1, state.finalWhite, eased);
+    state.currentWidth = currentWidth;
+    const whiteLeft = 0.5 - currentWidth / 2;
+    if (reelBattle.white) {
+      reelBattle.white.style.left = `${whiteLeft * 100}%`;
+      reelBattle.white.style.width = `${currentWidth * 100}%`;
+    }
+    state.fishPhase += dt * state.fishSpeed;
+    const safeAmplitude = Math.max(0.02, currentWidth / 2 - state.redWidth / 2 - 0.01);
+    if (state.success) {
+      const amp = Math.max(0.02, safeAmplitude);
+      state.fishPos = 0.5 + Math.sin(state.fishPhase) * amp;
+      state.fishPos = window.clamp(state.fishPos, whiteLeft + 0.02, whiteLeft + currentWidth - 0.02);
+    } else {
+      if (!state.failTriggered && state.elapsed > state.duration * 0.55) {
+        state.failTriggered = true;
+      }
+      if (state.failTriggered) {
+        state.fishPos += state.failDirection * dt * 0.35;
+      } else {
+        const amp = Math.max(0.02, safeAmplitude * 0.8);
+        state.fishPos = 0.5 + Math.sin(state.fishPhase) * amp;
+      }
+    }
+    const delta = state.fishPos - previousPos;
+    if (Math.abs(delta) > 0.0005) {
+      state.fishDirection = delta > 0 ? 1 : -1;
+    }
+    const facingRight = state.fishDirection > 0;
+    const trackWidth = reelBattle.white?.parentElement?.clientWidth || 0;
+    if (reelBattle.marker) {
+      reelBattle.marker.style.left = `${state.fishPos * 100}%`;
+    }
+    if (reelBattle.fishImage && trackWidth) {
+      const offset = (state.fishPos - 0.5) * trackWidth;
+      reelBattle.fishImage.style.transform = `translate(-50%, -50%) translateX(${offset}px)`;
+      reelBattle.fishImage.classList.toggle('flip', facingRight);
+    } else if (reelBattle.fishImage) {
+      reelBattle.fishImage.classList.toggle('flip', facingRight);
+    }
+    const whiteRight = whiteLeft + currentWidth;
+    const redLeft = 0.5 - state.redWidth / 2;
+    const redRight = 0.5 + state.redWidth / 2;
+    if (!state.resolved) {
+      if (state.success && currentWidth <= state.redWidth + 0.001) {
+        if (state.fishPos >= redLeft && state.fishPos <= redRight) {
+          resolveReelBattleOutcome(true);
+        }
+      }
+      if (!state.success && (state.fishPos < whiteLeft || state.fishPos > whiteRight)) {
+        resolveReelBattleOutcome(false);
+      }
+      if (state.elapsed >= state.duration + 0.5 && !state.resolved) {
+        resolveReelBattleOutcome(state.success);
+      }
+    }
+    if (reelBattle.autoAdvanceActive) {
+      reelBattle.autoAdvanceTimer = Math.max(0, reelBattle.autoAdvanceTimer - dt);
+      if (reelBattle.nextCountdownLabel) {
+        const seconds = Math.max(0, reelBattle.autoAdvanceTimer);
+        reelBattle.nextCountdownLabel.textContent = `${seconds.toFixed(1)}s`;
+      }
+      if (reelBattle.autoAdvanceTimer <= 0) {
+        clearNextBattleCountdown();
+        if (reelBattle.state && reelBattle.state.resolved) {
+          reelBattle.state = null;
+        }
+        beginNextReelBattle();
+        return;
+      }
+    }
+  }
+
+  function finishReelBattleSequence() {
+    reelBattle.state = null;
+    setModalVisibility(reelBattle.modal, false);
+    showCatchSummary();
+  }
+
+  function showCatchSummary() {
+    if (!reelBattle.summaryModal) {
+      preparePlayRound(true);
+      return;
+    }
+    const list = reelBattle.summaryList;
+    if (list) {
+      if (!reelBattle.results.length) {
+        list.innerHTML = '<p>아무 것도 잡지 못했습니다.</p>';
+      } else {
+        list.innerHTML = reelBattle.results
+          .map((result, index) => {
+            const fish = result.fish;
+            const name = escapeHtml(fish.spec?.displayName || `Catch ${index + 1}`);
+            const rarity = escapeHtml(fish.spec?.rarity || 'Unknown');
+            const points = result.points;
+            const label = result.success ? `+${points}` : '+0';
+            const status = result.success ? '성공' : '실패';
+            return `<p><span>${index + 1}. ${name} (${rarity}) – ${status}</span><span>${label}</span></p>`;
+          })
+          .join('');
+      }
+    }
+    if (reelBattle.summaryTotal) {
+      reelBattle.summaryTotal.textContent = reelBattle.totalPoints.toLocaleString();
+    }
+    setModalVisibility(reelBattle.summaryModal, true);
+  }
+
+  function closeCatchSummary() {
+    const total = reelBattle.totalPoints;
+    setModalVisibility(reelBattle.summaryModal, false);
+    if (total > 0) {
+      window.addPointsWithSparkle(total);
+    } else {
+      window.setHUD();
+    }
+    resetReelBattle();
+    preparePlayRound(true);
+  }
+
   function resetTargetCircle() {
     window.world.targetCircle = {
       distance: TARGET_MIN_DISTANCE,
@@ -313,7 +841,6 @@
     window.world.sinkDuration = 0;
     window.world.sinkStartDist = TARGET_MIN_DISTANCE;
     window.world.sinkEndDist = TARGET_MIN_DISTANCE;
-    window.world.pendingCatchSims = [];
     if (window.waveEffect) {
       window.waveEffect.playing = false;
       window.waveEffect.frameIndex = 0;
@@ -338,12 +865,12 @@
     window.camera.y = 0;
     window.world.actives = [];
     window.world.catches = [];
-    window.world.pendingCatchSims = [];
     window.resultsIndex = 0;
     window.world.time = 0;
     window.world.targetZoom = 1;
     window.world.viewZoom = 1;
     window.world.bobberVisible = false;
+    resetReelBattle();
     if (window.waveEffect) {
       window.waveEffect.playing = false;
       window.waveEffect.frameIndex = 0;
@@ -372,19 +899,23 @@
       }
     }
     resetTargetCircle();
-    clearCatchSimulations();
     updateDistanceReadout();
     if (window.minimap) window.minimap.style.display = 'flex';
     if (window.distanceEl) window.distanceEl.style.display = 'block';
     setCastPrompt(true, 'Press the Screen to cast the bobber');
     resetCharacterToIdle();
+    if (window.world.autoMode) {
+      scheduleAutoCast(window.rand(0.3, 0.6));
+    }
   }
 
   function exitToMenu() {
+    setAutoMode(false, false);
     window.state = window.GameState.Idle;
     window.camera.y = 0;
     setCastPrompt(false);
     awardRemainingCatchPoints();
+    resetReelBattle();
     window.world.targetCircle = null;
     window.world.actives = [];
     window.world.catches = [];
@@ -399,8 +930,6 @@
     window.world.sinkDuration = 0;
     window.world.sinkStartDist = TARGET_MIN_DISTANCE;
     window.world.sinkEndDist = TARGET_MIN_DISTANCE;
-    window.world.pendingCatchSims = [];
-    clearCatchSimulations();
     window.resultsIndex = 0;
     if (window.results) window.results.style.display = 'none';
     if (window.minimap) window.minimap.style.display = 'none';
@@ -457,10 +986,6 @@
     target.reachedTop = false;
     setCastPrompt(false);
     startCharacterCastAnimation();
-  }
-
-  function clearCatchSimulations() {
-    window.world.pendingCatchSims = [];
   }
 
   function triggerBobberImpact(distance) {
@@ -543,50 +1068,9 @@
     window.world.castDistance = target.distance;
     scatterFishesAroundTarget(target.distance);
     triggerBobberImpact(target.distance);
-    clearCatchSimulations();
     window.world.targetCircle = null;
     setCastPrompt(true, 'Pull!');
     updateDistanceReadout();
-  }
-
-  function updateCatchSimulations(dt) {
-    if (!Array.isArray(window.world.pendingCatchSims)) {
-      window.world.pendingCatchSims = [];
-    }
-    const sims = window.world.pendingCatchSims;
-    const actives = Array.isArray(window.world.actives) ? window.world.actives : [];
-
-    for (const active of actives) {
-      if (!active || !active.fish) continue;
-      let sim = sims.find(entry => entry.fish === active.fish);
-      if (!sim) {
-        sim = {
-          fish: active.fish,
-          active,
-          successes: 0,
-          failures: 0,
-          timer: window.rand(0, 0.2),
-          interval: window.rand(0.25, 0.55),
-          lastOutcome: null
-        };
-        sims.push(sim);
-      }
-      sim.active = active;
-      sim.timer += dt;
-      while (sim.timer >= sim.interval) {
-        sim.timer -= sim.interval;
-        const success = rollCatch(active);
-        if (success) {
-          sim.successes += 1;
-        } else {
-          sim.failures += 1;
-        }
-        sim.lastOutcome = success;
-        sim.interval = window.rand(0.25, 0.55);
-      }
-    }
-
-    window.world.pendingCatchSims = sims.filter(sim => actives.includes(sim.active));
   }
 
   function updateSinkPhase(dt) {
@@ -598,7 +1082,6 @@
     const nextDist = window.lerp(window.world.sinkStartDist, window.world.sinkEndDist, eased);
     window.world.bobberDist = window.clamp(nextDist, SINK_MIN_DISTANCE, TARGET_MAX_DISTANCE);
     updateDistanceReadout();
-    updateCatchSimulations(dt);
     if (window.world.sinkTimer >= duration) {
       finalizeCatchAttempt();
     }
@@ -626,53 +1109,33 @@
     window.world.castStage = 'resolved';
     setCastPrompt(false);
     const actives = Array.isArray(window.world.actives) ? window.world.actives.slice() : [];
-    const sims = Array.isArray(window.world.pendingCatchSims) ? window.world.pendingCatchSims : [];
-    const caughtNow = [];
     let anyActive = false;
-
     for (const active of actives) {
       if (!active || !active.fish) continue;
       anyActive = true;
-      const fish = active.fish;
-      const sim = sims.find(entry => entry.fish === fish) || null;
-      let success = false;
-      if (sim) {
-        const totalChecks = sim.successes + sim.failures;
-        if (totalChecks === 0) {
-          success = rollCatch(active);
-        } else if (sim.successes === sim.failures) {
-          success = sim.lastOutcome ?? rollCatch(active);
-        } else {
-          success = sim.successes > sim.failures;
-        }
-      } else {
-        success = rollCatch(active);
-      }
-
-      if (success) {
-        fish.finished = true;
-        fish.engaged = false;
-        if (fish.active) fish.active = null;
-        caughtNow.push(fish);
-        window.world.catches.push(fish);
-      }
       releaseActiveCircle(active, false);
     }
-
     window.world.actives = [];
-    clearCatchSimulations();
     window.world.bobberVisible = false;
 
-    if (caughtNow.length) {
-      showResults();
+    const detectionRange = window.DETECTION_RANGE_M ?? 5;
+    const candidates = gatherFishCandidates(detectionRange);
+    if (!candidates.length) {
+      window.showMissEffect();
+      if (!anyActive) {
+        window.toast('Miss – no fish bit the bobber.');
+      }
+      preparePlayRound(true);
       return;
     }
 
-    window.showMissEffect();
-    if (!anyActive) {
-      window.toast('Miss – no fish bit the bobber.');
+    for (const fish of candidates) {
+      if (!fish) continue;
+      fish.engaged = false;
+      if (fish.active) fish.active = null;
     }
-    preparePlayRound(true);
+    window.world.catches = [];
+    startReelBattleSequence(candidates);
   }
 
   function handlePointerUp() {
@@ -710,8 +1173,6 @@
 
     const fish = window.world.catches[window.resultsIndex];
     const points = computePoints(fish, window.world.castDistance);
-    window.settings.points += points;
-    window.setHUD();
 
     window.rTitle.textContent = `Catch ${window.resultsIndex + 1}/${count}`;
     const escapeHtml = value => String(value ?? '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
@@ -743,18 +1204,7 @@
   }
 
   function awardRemainingCatchPoints() {
-    if (!Array.isArray(window.world.catches) || !window.world.catches.length) return;
-    let bonus = 0;
-    for (let i = window.resultsIndex + 1; i < window.world.catches.length; i++) {
-      const fish = window.world.catches[i];
-      if (!fish) continue;
-      const points = computePoints(fish, window.world.castDistance);
-      window.settings.points += points;
-      bonus += points;
-    }
-    if (bonus > 0) {
-      window.setHUD();
-    }
+    return;
   }
 
   function closeResultsToContinue() {
@@ -1084,6 +1534,8 @@
     updateCharacterAnimation(dt);
     updateFishSimulation(dt);
     updateBobberWave(dt);
+    updateReelBattle(dt);
+    updateAutoPlay(dt);
 
     const metrics = getEnvironmentMetrics(window.canvas.width, window.canvas.height);
     if (window.state === window.GameState.Targeting) {
@@ -1160,6 +1612,21 @@
       closeResultsToContinue();
     });
 
+    if (reelBattle.nextBtn) {
+      reelBattle.nextBtn.addEventListener('click', () => {
+        if (!reelBattle.state || !reelBattle.state.resolved) return;
+        clearNextBattleCountdown();
+        reelBattle.state = null;
+        beginNextReelBattle();
+      });
+    }
+
+    if (reelBattle.summaryClose) {
+      reelBattle.summaryClose.addEventListener('click', () => {
+        closeCatchSummary();
+      });
+    }
+
     const comingSoon = label => () => window.toast(`${label} – Coming Soon`);
     if (window.shopBtn) window.shopBtn.addEventListener('click', comingSoon('Shop'));
     if (window.rankBtn) window.rankBtn.addEventListener('click', comingSoon('Ranking'));
@@ -1167,6 +1634,27 @@
     if (window.exitBtn) {
       window.exitBtn.addEventListener('click', () => {
         exitToMenu();
+      });
+    }
+
+    if (window.autoBtn) {
+      window.autoBtn.addEventListener('click', () => {
+        if (!window.dataLoaded || !window.assetsReady) {
+          window.toast('Load the data first.');
+          return;
+        }
+        if (!window.world.autoMode) {
+          if (window.state === window.GameState.Idle) {
+            if (window.settings.energy <= 0) {
+              window.toast('Not enough energy.');
+              return;
+            }
+            startPlaySession();
+          }
+          setAutoMode(true);
+        } else {
+          setAutoMode(false);
+        }
       });
     }
   }
