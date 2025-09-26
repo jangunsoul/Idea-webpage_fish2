@@ -130,6 +130,9 @@ window.CHARACTERS = window.gameData.characters;
 
 window.settings = {
   energy: 10,
+  energyMax: 10,
+  energyRegenInterval: 600,
+  energyCooldown: 0,
   points: 0,
   baseCast: 30,
   maxCast: 200,

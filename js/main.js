@@ -10,6 +10,7 @@
     status: null,
     info: null,
     nextBtn: null,
+    counter: null,
     summaryModal: null,
     summaryList: null,
     summaryTotal: null,
@@ -50,6 +51,8 @@
     '보물의 무게가 전해집니다!'
   ];
 
+  const ENERGY_WARNING = '에너지가 부족합니다. 플레이를 진행할 수 없습니다.';
+
   function ensureDomReferences() {
     window.canvas = document.getElementById('view');
     window.ctx = window.canvas?.getContext('2d') ?? null;
@@ -85,12 +88,14 @@
     reelBattle.status = document.getElementById('battleStatus');
     reelBattle.info = document.getElementById('battleInfo');
     reelBattle.nextBtn = document.getElementById('battleNext');
+    reelBattle.counter = document.getElementById('battleCounter');
     reelBattle.summaryModal = document.getElementById('catchSummary');
     reelBattle.summaryList = document.getElementById('summaryList');
     reelBattle.summaryTotal = document.getElementById('summaryTotal');
     reelBattle.summaryClose = document.getElementById('summaryClose');
     reelBattle.nextCountdownLabel = document.getElementById('battleNextCountdown');
     reelBattle.summaryCountdownLabel = document.getElementById('summaryCountdown');
+
     updateAutoButtonUI();
 
     if (!window.canvas || !window.ctx || !window.startBtn || !window.mainMenu) {
@@ -381,6 +386,17 @@
     element.setAttribute('aria-hidden', visible ? 'false' : 'true');
   }
 
+  function updateBattleCounter() {
+    if (!reelBattle.counter) return;
+    const total = Array.isArray(reelBattle.queue) ? reelBattle.queue.length : 0;
+    if (!total || reelBattle.index < 0 || reelBattle.index >= total) {
+      reelBattle.counter.textContent = '';
+      return;
+    }
+    const current = Math.min(reelBattle.index + 1, total);
+    reelBattle.counter.textContent = `${current}/${total}`;
+  }
+
   function setBattleStatusMessage(state, message, duration = 1.1) {
     if (!reelBattle.status || !state || state.resolved) return;
     if (typeof message !== 'string' || !message.trim()) return;
@@ -601,6 +617,43 @@
     }
   }
 
+  function updateEnergyRegen(dt) {
+    const maxEnergy = window.settings.energyMax ?? 10;
+    const interval = window.settings.energyRegenInterval ?? 600;
+    if (!Number.isFinite(interval) || interval <= 0) {
+      window.settings.energyCooldown = 0;
+      return;
+    }
+    if ((window.settings.energy ?? 0) >= maxEnergy) {
+      if (window.settings.energyCooldown !== 0) {
+        window.settings.energyCooldown = 0;
+        window.setHUD();
+      }
+      return;
+    }
+    let cooldown = window.settings.energyCooldown;
+    if (!Number.isFinite(cooldown) || cooldown <= 0) {
+      cooldown = interval;
+    }
+    const previousDisplay = Math.ceil(cooldown) - 1;
+    cooldown = Math.max(0, cooldown - dt);
+    window.settings.energyCooldown = cooldown;
+    if (cooldown <= 0) {
+      window.settings.energy = Math.min(maxEnergy, (window.settings.energy ?? 0) + 1);
+      if (window.settings.energy < maxEnergy) {
+        window.settings.energyCooldown = interval;
+      } else {
+        window.settings.energyCooldown = 0;
+      }
+      window.setHUD();
+      return;
+    }
+    const nextDisplay = Math.ceil(cooldown) - 1;
+    if (nextDisplay !== previousDisplay) {
+      window.setHUD();
+    }
+  }
+
   function resetReelBattle(hideModals = true) {
     reelBattle.queue = [];
     reelBattle.index = -1;
@@ -608,6 +661,7 @@
     reelBattle.state = null;
     reelBattle.totalPoints = 0;
     reelBattle.bonusEnergy = 0;
+    updateBattleCounter();
     clearNextBattleCountdown();
     clearSummaryCountdown();
     window.world.battleQueue = [];
@@ -642,6 +696,52 @@
       reelBattle.nextBtn.disabled = true;
       reelBattle.nextBtn.classList.add('disabled');
     }
+  }
+
+  function ensureEnergyAvailable(showMessage = true) {
+    if ((window.settings.energy ?? 0) > 0) return true;
+    handleOutOfEnergy(showMessage);
+    return false;
+  }
+
+  function handleOutOfEnergy(showMessage = true) {
+    setAutoMode(false, false);
+    setModalVisibility(reelBattle.modal, false);
+    setModalVisibility(reelBattle.summaryModal, false);
+    window.state = window.GameState.Idle;
+    window.world.castStage = 'idle';
+    window.world.targetCircle = null;
+    window.world.autoArmed = false;
+    window.world.autoHoldActive = false;
+    window.world.autoCastTimer = 0;
+    window.world.autoReleaseDelay = 0;
+    window.world.autoTargetDistance = null;
+    window.world.bobberVisible = false;
+    window.world.sinkTimer = 0;
+    window.world.sinkDuration = 0;
+    window.world.bobberDist = TARGET_MIN_DISTANCE;
+    window.world.castDistance = TARGET_MIN_DISTANCE;
+    if (window.minimap) window.minimap.style.display = 'none';
+    if (window.distanceEl) window.distanceEl.style.display = 'none';
+    setCastPrompt(false);
+    window.setGameplayLayout(false);
+    resetCharacterToIdle();
+    updateDistanceReadout();
+    if (showMessage) window.toast(ENERGY_WARNING);
+  }
+
+  function consumeEnergyForCast() {
+    if (!ensureEnergyAvailable(true)) return false;
+    const maxEnergy = window.settings.energyMax ?? 10;
+    const regenInterval = window.settings.energyRegenInterval ?? 600;
+    window.settings.energy = Math.max(0, (window.settings.energy ?? 0) - 1);
+    if (window.settings.energy < maxEnergy) {
+      window.settings.energyCooldown = regenInterval;
+    } else {
+      window.settings.energyCooldown = 0;
+    }
+    window.setHUD();
+    return true;
   }
 
   function renderBattleFishArt(fish) {
@@ -807,6 +907,7 @@
       beginNextReelBattle();
       return;
     }
+    updateBattleCounter();
     const fish = candidate.fish;
     const baseStatus = candidate.type === 'treasure' ? '보물 상자를 끌어올리는 중...' : '줄을 잡아당기는 중...';
     if (reelBattle.status) {
@@ -1205,11 +1306,16 @@
     }
     if (bonusEnergy > 0) {
       window.settings.energy += bonusEnergy;
+      if (window.settings.energy >= (window.settings.energyMax ?? 10)) {
+        window.settings.energyCooldown = 0;
+      }
       window.setHUD();
       window.toast(`Energy +${bonusEnergy}`);
     }
     resetReelBattle();
-    preparePlayRound(true);
+    if (ensureEnergyAvailable()) {
+      preparePlayRound(true);
+    }
   }
 
   function resetTargetCircle() {
@@ -1248,6 +1354,7 @@
   }
 
   function preparePlayRound(respawn = true) {
+    if (!ensureEnergyAvailable()) return;
     window.state = window.GameState.Targeting;
     window.camera.y = 0;
     window.world.actives = [];
@@ -1337,9 +1444,8 @@
   }
 
   function startPlaySession() {
+    if (!ensureEnergyAvailable()) return;
     window.setGameplayLayout(true);
-    window.settings.energy = Math.max(0, window.settings.energy - 1);
-    window.setHUD();
     preparePlayRound(true);
   }
 
@@ -1367,7 +1473,8 @@
     updateDistanceReadout();
   }
 
-  function handlePointerDown() {
+  function handlePointerDown(event) {
+    if (event?.target?.closest?.('#autoBtn')) return;
     if (window.state !== window.GameState.Targeting) return;
     if (window.world.castStage !== 'aiming') return;
     const target = window.world.targetCircle;
@@ -1449,6 +1556,13 @@
     if (window.world.castStage !== 'aiming') return;
     const target = window.world.targetCircle;
     if (!target) return;
+    if (!consumeEnergyForCast()) {
+      target.holding = false;
+      target.velocity = 0;
+      target.holdTime = 0;
+      window.world.targetZoom = 1;
+      return;
+    }
     window.world.castStage = 'sinking';
     window.world.bobberVisible = true;
     window.world.sinkTimer = 0;
@@ -1530,7 +1644,8 @@
     startReelBattleSequence(candidates);
   }
 
-  function handlePointerUp() {
+  function handlePointerUp(event) {
+    if (event?.target?.closest?.('#autoBtn')) return;
     if (window.state !== window.GameState.Targeting) return;
     if (window.world.castStage !== 'aiming') return;
     const target = window.world.targetCircle;
@@ -1928,6 +2043,7 @@
     updateBobberWave(dt);
     updateReelBattle(dt);
     updateAutoPlay(dt);
+    updateEnergyRegen(dt);
 
     const metrics = getEnvironmentMetrics(window.canvas.width, window.canvas.height);
     if (window.state === window.GameState.Targeting) {
@@ -1971,7 +2087,7 @@
       }
       if (window.state !== window.GameState.Idle) return;
       if (window.settings.energy <= 0) {
-        window.toast('Not enough energy.');
+        window.toast(ENERGY_WARNING);
         return;
       }
       startPlaySession();
@@ -1980,7 +2096,7 @@
     window.canvas.addEventListener('click', () => {
       if (window.state === window.GameState.Idle && window.dataLoaded && window.assetsReady) {
         if (window.settings.energy <= 0) {
-          window.toast('Not enough energy.');
+          window.toast(ENERGY_WARNING);
           return;
         }
         startPlaySession();
@@ -2038,7 +2154,7 @@
         if (!window.world.autoMode) {
           if (window.state === window.GameState.Idle) {
             if (window.settings.energy <= 0) {
-              window.toast('Not enough energy.');
+              window.toast(ENERGY_WARNING);
               return;
             }
             setAutoMode(true, false);
@@ -2073,12 +2189,6 @@
 
     setupEventListeners();
     requestAnimationFrame(gameLoop);
-    setInterval(() => {
-      if (window.settings.energy < 10) {
-        window.settings.energy++;
-        window.setHUD();
-      }
-    }, 30000);
   }
 
   document.addEventListener('DOMContentLoaded', () => {

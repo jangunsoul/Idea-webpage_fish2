@@ -73,6 +73,10 @@
       overflow: hidden;
     }
 
+    #energy.overcap {
+      color: #22c55e;
+    }
+
     .pill.sparkle {
       animation: sparkleFlash 0.9s ease-out;
       box-shadow: 0 0 24px rgba(111, 255, 233, 0.45);
@@ -526,6 +530,25 @@
       letter-spacing: 0.08em;
       text-transform: uppercase;
       margin-bottom: 22px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 12px;
+      text-align: center;
+    }
+
+    .battle-card h3 .battle-title {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 6px;
+    }
+
+    .battle-card h3 .battle-counter {
+      font-size: 1rem;
+      letter-spacing: 0.05em;
+      text-transform: none;
+      color: var(--secondary);
     }
 
     .battle-gauge {
@@ -842,7 +865,7 @@
 
     <div class="hud">
       <div class="left">
-        <div class="pill">⚡ Energy: <span id="energy">10</span></div>
+        <div class="pill">⚡ Energy: <span id="energy">10/10</span></div>
       </div>
       <div class="right">
         <div class="pill">🎣 Points: <span id="points">0</span></div>
@@ -889,7 +912,7 @@
 
     <div class="modal battle-modal" id="reelBattleModal" aria-hidden="true">
       <div class="battle-card">
-        <h3>Reel battle</h3>
+        <h3><span class="battle-title" id="battleTitle">Reel battle</span><span class="battle-counter" id="battleCounter"></span></h3>
         <div class="battle-gauge">
           <div class="gauge-track">
             <div class="gauge-white" id="battleGaugeWhite"></div>

@@ -59,7 +59,22 @@ window.showMissEffect = function showMissEffect() {
 };
 
 window.setHUD = function setHUD() {
-  if (window.energyEl) window.energyEl.textContent = window.settings.energy;
+  if (window.energyEl) {
+    const energy = window.settings.energy ?? 0;
+    const maxEnergy = window.settings.energyMax ?? 10;
+    const cooldown = window.settings.energyCooldown ?? 0;
+    let text = `${energy}/${maxEnergy}`;
+    if (energy < maxEnergy) {
+      const seconds = Math.max(0, Math.ceil(cooldown) - 1);
+      const minutesPart = Math.floor(seconds / 60)
+        .toString()
+        .padStart(2, '0');
+      const secondsPart = (seconds % 60).toString().padStart(2, '0');
+      text += ` (${minutesPart}:${secondsPart})`;
+    }
+    window.energyEl.textContent = text;
+    window.energyEl.classList.toggle('overcap', energy > maxEnergy);
+  }
   if (window.pointsEl) window.pointsEl.textContent = window.settings.points;
 };
 
