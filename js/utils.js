@@ -136,6 +136,22 @@ window.addEnergy = function addEnergy(amount, options = {}) {
   return window.settings.energy;
 };
 
+window.addPointsWithSparkle = function addPointsWithSparkle(amount) {
+  if (!Number.isFinite(amount) || amount === 0) {
+    window.setHUD();
+    return;
+  }
+  window.settings.points += amount;
+  window.setHUD();
+  const target = window.pointsEl?.closest?.('.pill') || window.pointsEl;
+  if (!target) return;
+  target.classList.remove('sparkle');
+  void target.offsetWidth;
+  target.classList.add('sparkle');
+  clearTimeout(target._sparkleTimer);
+  target._sparkleTimer = setTimeout(() => target.classList.remove('sparkle'), 900);
+};
+
 window.setGameplayLayout = function setGameplayLayout(active) {
   const container = document.getElementById('game');
   if (container) container.classList.toggle('gameplay', !!active);
