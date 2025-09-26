@@ -92,6 +92,7 @@ window.mainMenu = null;
 window.titleBar = null;
 window.navBar = null;
 window.exitBtn = null;
+window.autoBtn = null;
 window.shopBtn = null;
 window.rankBtn = null;
 window.premiumBtn = null;
@@ -154,7 +155,16 @@ window.world = {
   sinkDuration: 0,
   sinkStartDist: 0,
   sinkEndDist: 0,
-  pendingCatchSims: []
+  battleQueue: [],
+  battleResults: [],
+  currentBattleIndex: -1,
+  pendingPointTotal: 0,
+  autoMode: false,
+  autoHoldActive: false,
+  autoCastTimer: 0,
+  autoReleaseDelay: 0,
+  autoTargetDistance: null,
+  autoArmed: false
 };
 
 window.camera = { y: 0 };
