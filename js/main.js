@@ -33,6 +33,19 @@
     summaryCountdownActive: false
   };
 
+  const SHOP_PRODUCTS = [
+    { id: 'energy-5', name: 'Energy 5', description: '에너지 5 회복', energy: 5, cost: 2000 },
+    { id: 'energy-10', name: 'Energy 10', description: '에너지 10 회복', energy: 10, cost: 4000 },
+    { id: 'energy-20', name: 'Energy 20', description: '에너지 20 회복', energy: 20, cost: 7500 }
+  ];
+
+  const shopUI = {
+    modal: null,
+    list: null,
+    closeBtn: null,
+    buttons: new Map()
+  };
+
   const FISH_TUG_MESSAGES = [
     '물고기가 라인을 흔듭니다!',
     '강하게 저항하고 있어요!',
@@ -63,12 +76,18 @@
     window.exitBtn = document.getElementById('exitBtn');
     window.autoBtn = document.getElementById('autoBtn');
     window.shopBtn = document.getElementById('shopBtn');
+    window.shopModal = document.getElementById('shopModal');
+    window.shopCloseBtn = document.getElementById('shopClose');
+    window.shopProducts = document.getElementById('shopProducts');
+    window.shopPointsEl = document.getElementById('shopPoints');
     window.rankBtn = document.getElementById('rankBtn');
     window.premiumBtn = document.getElementById('premiumBtn');
     window.castPrompt = document.getElementById('castPrompt');
     window.toastEl = document.getElementById('toast');
     window.missEffect = document.getElementById('missEffect');
     window.distanceEl = document.getElementById('distance');
+    window.autoCountdownEl = document.getElementById('autoCountdown');
+    window.autoCountdownTimerEl = document.getElementById('autoCountdownTimer');
     window.minimap = document.getElementById('minimap');
     window.mmbar = document.getElementById('mmbar');
     window.mmCells = document.getElementById('mmcells');
@@ -96,6 +115,13 @@
     reelBattle.nextCountdownLabel = document.getElementById('battleNextCountdown');
     reelBattle.summaryCountdownLabel = document.getElementById('summaryCountdown');
 
+    shopUI.modal = window.shopModal;
+    shopUI.list = window.shopProducts;
+    shopUI.closeBtn = window.shopCloseBtn;
+    window.updateShopAvailability = updateShopAvailability;
+    buildShopProducts();
+    updateShopAvailability();
+    updateAutoCountdownUI();
     updateAutoButtonUI();
 
     if (!window.canvas || !window.ctx || !window.startBtn || !window.mainMenu) {
@@ -386,6 +412,122 @@
     element.setAttribute('aria-hidden', visible ? 'false' : 'true');
   }
 
+  function updateShopAvailability() {
+    const points = window.settings.points ?? 0;
+    shopUI.buttons.forEach(entry => {
+      if (!entry || !entry.button) return;
+      const price = Math.max(0, Math.round(entry.product.cost ?? 0));
+      entry.button.disabled = points < price;
+    });
+  }
+
+  function buildShopProducts() {
+    if (!shopUI.list) return;
+    if (shopUI.buttons.size) {
+      updateShopAvailability();
+      return;
+    }
+    shopUI.list.innerHTML = '';
+    shopUI.buttons.clear();
+    SHOP_PRODUCTS.forEach(product => {
+      const item = document.createElement('div');
+      item.className = 'shop-item';
+
+      const details = document.createElement('div');
+      details.className = 'details';
+
+      const title = document.createElement('h4');
+      title.textContent = product.name;
+
+      const desc = document.createElement('p');
+      const benefit = product.energy ? `Energy +${product.energy}` : product.description || '';
+      const costText = `${product.cost.toLocaleString()} Point`;
+      desc.textContent = benefit ? `${costText} • ${benefit}` : costText;
+
+      details.appendChild(title);
+      details.appendChild(desc);
+
+      const button = document.createElement('button');
+      button.type = 'button';
+      button.textContent = '구매';
+      button.addEventListener('click', () => purchaseShopItem(product));
+
+      item.appendChild(details);
+      item.appendChild(button);
+
+      shopUI.list.appendChild(item);
+      shopUI.buttons.set(product.id, { button, product });
+    });
+    updateShopAvailability();
+  }
+
+  function openShop() {
+    buildShopProducts();
+    if (shopUI.modal) {
+      setModalVisibility(shopUI.modal, true);
+    }
+  }
+
+  function closeShop() {
+    if (shopUI.modal) {
+      setModalVisibility(shopUI.modal, false);
+    }
+  }
+
+  function purchaseShopItem(product) {
+    if (!product) return;
+    const cost = Math.max(0, Math.round(product.cost ?? 0));
+    if (cost > 0 && (window.settings.points ?? 0) < cost) {
+      window.toast('포인트가 부족합니다.');
+      return;
+    }
+    let spent = false;
+    if (cost > 0) {
+      spent = window.spendPoints(cost);
+      if (!spent) {
+        window.toast('포인트가 부족합니다.');
+        return;
+      }
+    }
+    let granted = false;
+    try {
+      if (product.energy) {
+        const amount = Math.max(0, Math.round(product.energy));
+        if (amount > 0) {
+          window.addEnergy(amount, { toast: `${product.name} 구매! Energy +${amount}` });
+          granted = true;
+        }
+      }
+      if (typeof product.onPurchase === 'function') {
+        const result = product.onPurchase();
+        if (result === false) {
+          if (spent && cost > 0) {
+            window.settings.points += cost;
+            window.setHUD();
+          }
+          updateShopAvailability();
+          window.toast('구매가 취소되었습니다.');
+          return;
+        }
+        granted = true;
+      }
+    } catch (err) {
+      console.error('Shop purchase failed:', err);
+      if (spent && cost > 0) {
+        window.settings.points += cost;
+        window.setHUD();
+      }
+      updateShopAvailability();
+      window.toast('구매 처리 중 오류가 발생했습니다.');
+      return;
+    }
+    if (!granted) {
+      window.toast(`${product.name} 구매 완료!`);
+      window.setHUD();
+    }
+    updateShopAvailability();
+  }
+
   function updateBattleCounter() {
     if (!reelBattle.counter) return;
     const total = Array.isArray(reelBattle.queue) ? reelBattle.queue.length : 0;
@@ -444,12 +586,68 @@
     }
   }
 
+  function updateAutoCountdownUI() {
+    if (!window.autoCountdownEl) return;
+    const active = !!window.world.autoCountdownActive;
+    window.autoCountdownEl.classList.toggle('show', active);
+    window.autoCountdownEl.setAttribute('aria-hidden', active ? 'false' : 'true');
+    if (active && window.autoCountdownTimerEl) {
+      const seconds = Math.max(0, window.world.autoCountdownTimer || 0);
+      window.autoCountdownTimerEl.textContent = seconds.toFixed(1);
+    }
+  }
+
+  function showAutoCountdown(duration = 2, callback) {
+    window.world.autoCountdownActive = true;
+    window.world.autoCountdownTimer = Math.max(0, Number.isFinite(duration) ? duration : 0);
+    window.world.autoCountdownCallback = typeof callback === 'function' ? callback : null;
+    updateAutoCountdownUI();
+    updateAutoButtonUI();
+  }
+
+  function cancelAutoCountdown() {
+    window.world.autoCountdownActive = false;
+    window.world.autoCountdownTimer = 0;
+    window.world.autoCountdownCallback = null;
+    updateAutoCountdownUI();
+    updateAutoButtonUI();
+  }
+
   function updateAutoButtonUI() {
     if (!window.autoBtn) return;
+    if (window.world.autoCountdownActive) {
+      const seconds = Math.max(0, window.world.autoCountdownTimer || 0).toFixed(1);
+      window.autoBtn.classList.remove('active');
+      window.autoBtn.classList.add('pending');
+      window.autoBtn.setAttribute('aria-pressed', 'false');
+      window.autoBtn.textContent = `Auto (${seconds}s)`;
+      return;
+    }
+    window.autoBtn.classList.remove('pending');
     const active = !!window.world.autoMode;
     window.autoBtn.classList.toggle('active', active);
     window.autoBtn.setAttribute('aria-pressed', active ? 'true' : 'false');
     window.autoBtn.textContent = active ? 'Auto On' : 'Auto';
+  }
+
+  function updateAutoCountdown(dt) {
+    if (!window.world.autoCountdownActive) return;
+    const previous = window.world.autoCountdownTimer || 0;
+    const next = Math.max(0, previous - dt);
+    window.world.autoCountdownTimer = next;
+    const prevLabel = Math.max(0, previous).toFixed(1);
+    const nextLabel = Math.max(0, next).toFixed(1);
+    if (nextLabel !== prevLabel || next <= 0) {
+      updateAutoCountdownUI();
+      updateAutoButtonUI();
+    }
+    if (next <= 0) {
+      const callback = window.world.autoCountdownCallback;
+      cancelAutoCountdown();
+      if (typeof callback === 'function') {
+        callback();
+      }
+    }
   }
 
   function computeAutoTargetDistance() {
@@ -551,6 +749,7 @@
     window.world.autoHoldActive = false;
     window.world.autoArmed = false;
     if (!next) {
+      cancelAutoCountdown();
       window.world.autoCastTimer = 0;
       window.world.autoReleaseDelay = 0;
       window.world.autoTargetDistance = null;
@@ -706,6 +905,7 @@
 
   function handleOutOfEnergy(showMessage = true) {
     setAutoMode(false, false);
+    cancelAutoCountdown();
     setModalVisibility(reelBattle.modal, false);
     setModalVisibility(reelBattle.summaryModal, false);
     window.state = window.GameState.Idle;
@@ -1305,12 +1505,7 @@
       window.setHUD();
     }
     if (bonusEnergy > 0) {
-      window.settings.energy += bonusEnergy;
-      if (window.settings.energy >= (window.settings.energyMax ?? 10)) {
-        window.settings.energyCooldown = 0;
-      }
-      window.setHUD();
-      window.toast(`Energy +${bonusEnergy}`);
+      window.addEnergy(bonusEnergy, { toast: `Energy +${bonusEnergy}` });
     }
     resetReelBattle();
     if (ensureEnergyAvailable()) {
@@ -1445,6 +1640,7 @@
 
   function startPlaySession() {
     if (!ensureEnergyAvailable()) return;
+    closeShop();
     window.setGameplayLayout(true);
     preparePlayRound(true);
   }
@@ -2042,6 +2238,7 @@
     updateFishSimulation(dt);
     updateBobberWave(dt);
     updateReelBattle(dt);
+    updateAutoCountdown(dt);
     updateAutoPlay(dt);
     updateEnergyRegen(dt);
 
@@ -2136,9 +2333,27 @@
     }
 
     const comingSoon = label => () => window.toast(`${label} – Coming Soon`);
-    if (window.shopBtn) window.shopBtn.addEventListener('click', comingSoon('Shop'));
+    if (window.shopBtn) {
+      window.shopBtn.addEventListener('click', () => {
+        if (window.state !== window.GameState.Idle) return;
+        openShop();
+      });
+    }
     if (window.rankBtn) window.rankBtn.addEventListener('click', comingSoon('Ranking'));
     if (window.premiumBtn) window.premiumBtn.addEventListener('click', comingSoon('Premium Mode'));
+    if (shopUI.closeBtn) {
+      shopUI.closeBtn.addEventListener('click', () => closeShop());
+    }
+    if (shopUI.modal) {
+      shopUI.modal.addEventListener('click', event => {
+        if (event.target === shopUI.modal) closeShop();
+      });
+    }
+    document.addEventListener('keydown', event => {
+      if (event.key === 'Escape' && shopUI.modal?.getAttribute('aria-hidden') === 'false') {
+        closeShop();
+      }
+    });
     if (window.exitBtn) {
       window.exitBtn.addEventListener('click', () => {
         exitToMenu();
@@ -2151,18 +2366,27 @@
           window.toast('Load the data first.');
           return;
         }
+        if (window.world.autoCountdownActive) {
+          cancelAutoCountdown();
+          window.toast('Auto 시작을 취소했습니다.');
+          return;
+        }
         if (!window.world.autoMode) {
-          if (window.state === window.GameState.Idle) {
-            if (window.settings.energy <= 0) {
-              window.toast(ENERGY_WARNING);
-              return;
-            }
-            setAutoMode(true, false);
-            startPlaySession();
-          } else {
-            setAutoMode(true, false);
-            window.toast('Auto 모드가 다음 라운드부터 적용됩니다.');
+          if (window.settings.energy <= 0) {
+            window.toast(ENERGY_WARNING);
+            return;
           }
+          const triggerAutoStart = () => {
+            if (!ensureEnergyAvailable()) return;
+            setAutoMode(true, true);
+            if (window.state === window.GameState.Idle) {
+              startPlaySession();
+            } else if (window.state === window.GameState.Targeting) {
+              scheduleAutoCast(window.rand(0.3, 0.6));
+            }
+            window.toast('Auto 모드를 시작했습니다.');
+          };
+          showAutoCountdown(2, triggerAutoStart);
         } else {
           setAutoMode(false, false);
           window.toast('Auto 모드를 종료했습니다.');

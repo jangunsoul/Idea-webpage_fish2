@@ -75,7 +75,65 @@ window.setHUD = function setHUD() {
     window.energyEl.textContent = text;
     window.energyEl.classList.toggle('overcap', energy > maxEnergy);
   }
-  if (window.pointsEl) window.pointsEl.textContent = window.settings.points;
+  const pointsText = (window.settings.points ?? 0).toLocaleString();
+  if (window.pointsEl) window.pointsEl.textContent = pointsText;
+  if (window.shopPointsEl) window.shopPointsEl.textContent = pointsText;
+  if (typeof window.updateShopAvailability === 'function') {
+    window.updateShopAvailability();
+  }
+};
+
+window.addPointsWithSparkle = function addPointsWithSparkle(amount) {
+  if (!Number.isFinite(amount) || amount === 0) {
+    window.setHUD();
+    return;
+  }
+  window.settings.points += amount;
+  window.setHUD();
+  const target = window.pointsEl?.closest?.('.pill') || window.pointsEl;
+  if (!target) return;
+  target.classList.remove('sparkle');
+  void target.offsetWidth;
+  target.classList.add('sparkle');
+  clearTimeout(target._sparkleTimer);
+  target._sparkleTimer = setTimeout(() => target.classList.remove('sparkle'), 900);
+};
+
+window.spendPoints = function spendPoints(cost) {
+  if (!Number.isFinite(cost) || cost <= 0) return true;
+  const current = window.settings.points ?? 0;
+  if (current < cost) return false;
+  window.settings.points = current - cost;
+  window.setHUD();
+  return true;
+};
+
+window.addEnergy = function addEnergy(amount, options = {}) {
+  if (!Number.isFinite(amount) || amount === 0) {
+    window.setHUD();
+    return window.settings.energy ?? 0;
+  }
+  const maxEnergy = window.settings.energyMax ?? 10;
+  const regenInterval = window.settings.energyRegenInterval ?? 600;
+  const current = window.settings.energy ?? 0;
+  const next = Math.max(0, current + amount);
+  window.settings.energy = next;
+  if (next >= maxEnergy) {
+    window.settings.energyCooldown = 0;
+  } else if (amount > 0) {
+    if (!Number.isFinite(window.settings.energyCooldown) || window.settings.energyCooldown <= 0) {
+      window.settings.energyCooldown = regenInterval;
+    }
+  }
+  window.setHUD();
+  if (options.toast) {
+    const message =
+      typeof options.toast === 'string'
+        ? options.toast
+        : `Energy ${amount > 0 ? '+' : ''}${amount}`;
+    window.toast(message);
+  }
+  return window.settings.energy;
 };
 
 window.addPointsWithSparkle = function addPointsWithSparkle(amount) {

@@ -288,6 +288,12 @@
       color: var(--secondary);
     }
 
+    #autoBtn.pending {
+      background: rgba(91, 192, 190, 0.12);
+      border-color: rgba(111, 255, 233, 0.35);
+      color: var(--secondary);
+    }
+
     #autoBtn:hover {
       border-color: rgba(111, 255, 233, 0.45);
       background: rgba(15, 23, 42, 0.95);
@@ -510,6 +516,168 @@
       align-items: center;
       z-index: 100;
       backdrop-filter: blur(10px);
+    }
+
+    .shop-modal .shop-card {
+      background: linear-gradient(160deg, rgba(28, 37, 65, 0.95), rgba(15, 23, 42, 0.92));
+      border: 1px solid rgba(111, 255, 233, 0.18);
+      box-shadow: 0 18px 40px rgba(2, 8, 23, 0.65);
+      padding: 28px 30px 36px;
+      border-radius: 22px;
+      width: min(420px, 92vw);
+      color: var(--text);
+      position: relative;
+      display: flex;
+      flex-direction: column;
+      gap: 22px;
+    }
+
+    .shop-card h3 {
+      font-size: 1.6rem;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      text-align: center;
+    }
+
+    .shop-close {
+      position: absolute;
+      top: 16px;
+      right: 16px;
+      width: 34px;
+      height: 34px;
+      border-radius: 50%;
+      border: 1px solid rgba(148, 163, 184, 0.35);
+      background: rgba(2, 8, 23, 0.6);
+      color: var(--text);
+      font-size: 1.2rem;
+      font-weight: 600;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      transition: all 0.2s ease;
+    }
+
+    .shop-close:hover {
+      transform: scale(1.05);
+      border-color: rgba(111, 255, 233, 0.55);
+    }
+
+    .shop-balance {
+      font-size: 0.95rem;
+      color: var(--text-dim);
+      text-align: center;
+    }
+
+    .shop-products {
+      display: flex;
+      flex-direction: column;
+      gap: 16px;
+      max-height: min(320px, 50vh);
+      overflow-y: auto;
+      padding-right: 4px;
+    }
+
+    .shop-products::-webkit-scrollbar {
+      width: 6px;
+    }
+
+    .shop-products::-webkit-scrollbar-thumb {
+      background: rgba(111, 255, 233, 0.25);
+      border-radius: 3px;
+    }
+
+    .shop-item {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 14px 18px;
+      background: rgba(9, 14, 31, 0.65);
+      border: 1px solid rgba(111, 255, 233, 0.18);
+      border-radius: 16px;
+      gap: 20px;
+    }
+
+    .shop-item .details {
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+    }
+
+    .shop-item h4 {
+      font-size: 1.05rem;
+      font-weight: 700;
+      letter-spacing: 0.04em;
+    }
+
+    .shop-item p {
+      font-size: 0.9rem;
+      color: var(--text-dim);
+    }
+
+    .shop-item button {
+      padding: 10px 20px;
+      border-radius: 999px;
+      border: none;
+      background: var(--primary);
+      color: #fff;
+      font-weight: 600;
+      cursor: pointer;
+      transition: transform 0.2s ease, opacity 0.2s ease;
+      min-width: 96px;
+    }
+
+    .shop-item button:disabled {
+      opacity: 0.5;
+      cursor: not-allowed;
+    }
+
+    .shop-item button:not(:disabled):hover {
+      transform: translateY(-1px);
+    }
+
+    .auto-countdown {
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%) scale(0.92);
+      background: rgba(2, 8, 23, 0.82);
+      border: 1px solid rgba(111, 255, 233, 0.25);
+      border-radius: 18px;
+      padding: 26px 36px;
+      text-align: center;
+      color: var(--text);
+      box-shadow: 0 18px 48px rgba(2, 8, 23, 0.6);
+      opacity: 0;
+      pointer-events: none;
+      transition: opacity 0.25s ease, transform 0.25s ease;
+      z-index: 120;
+    }
+
+    .auto-countdown.show {
+      opacity: 1;
+      transform: translate(-50%, -50%) scale(1);
+    }
+
+    .auto-countdown-title {
+      font-size: 1.2rem;
+      font-weight: 700;
+      letter-spacing: 0.04em;
+      text-transform: uppercase;
+    }
+
+    .auto-countdown-timer {
+      margin-top: 8px;
+      font-size: 2.6rem;
+      font-weight: 800;
+      color: var(--secondary);
+      letter-spacing: 0.08em;
+    }
+
+    .auto-countdown-timer span {
+      font-size: 1rem;
+      margin-left: 4px;
+      color: var(--text-dim);
     }
 
     .battle-modal .battle-card,
@@ -868,7 +1036,7 @@
         <div class="pill">⚡ Energy: <span id="energy">10/10</span></div>
       </div>
       <div class="right">
-        <div class="pill">🎣 Points: <span id="points">0</span></div>
+        <div class="pill">🎣 Points: <span id="points">3,000</span></div>
       </div>
     </div>
 
@@ -883,13 +1051,30 @@
       <button class="nav-btn" id="premiumBtn" type="button">Premium Mode</button>
     </div>
 
+    <div class="modal shop-modal" id="shopModal" aria-hidden="true">
+      <div class="shop-card">
+        <button class="shop-close" id="shopClose" type="button" aria-label="Close shop">×</button>
+        <h3>Shop</h3>
+        <p class="shop-balance">현재 포인트: <span id="shopPoints">3,000</span></p>
+        <div class="shop-products" id="shopProducts"></div>
+      </div>
+    </div>
+
     <button id="exitBtn" type="button">Exit</button>
     <button id="autoBtn" type="button" aria-pressed="false">Auto</button>
 
-    <div class="version-tag" id="versionTag" aria-hidden="true">v1.0.4</div>
+    <div class="version-tag" id="versionTag" aria-hidden="true">v1.0.5</div>
     <div class="toast" id="toast"></div>
     <div class="miss-effect" id="missEffect">MISS!</div>
     <div class="distance" id="distance"></div>
+
+    <div class="auto-countdown" id="autoCountdown" aria-hidden="true">
+      <div class="auto-countdown-title">Auto Play Start!</div>
+      <div class="auto-countdown-timer">
+        <span id="autoCountdownTimer">2.0</span>
+        <span>s</span>
+      </div>
+    </div>
 
     <div class="minimap" id="minimap" aria-hidden="true">
       <div class="mmbar" id="mmbar">
