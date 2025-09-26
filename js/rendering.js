@@ -131,6 +131,22 @@ function updateCharacterAnimation(dt) {
   }
 }
 
+function drawCharacterPlatform(charBaseX, charWidth, footY, metrics) {
+  const dock = environmentState.dock;
+  if (!dock) return;
+  const tileH = Math.max(1, metrics.tileH);
+  const scale = (tileH * 1.05) / Math.max(1, dock.height);
+  const destH = dock.height * scale;
+  const destW = dock.width * scale;
+  const centerX = charBaseX + charWidth * 0.5;
+  const destX = centerX - destW * 0.5;
+  const destY = footY - destH + tileH * 0.12;
+  ctx.save();
+  ctx.globalAlpha = 0.92;
+  ctx.drawImage(dock, destX, destY, destW, destH);
+  ctx.restore();
+}
+
 // 캐릭터 스프라이트 그리기
 function drawCharacterSprite(W, H, metrics, cameraY) {
   const sprite = characterSprite;
@@ -143,6 +159,8 @@ function drawCharacterSprite(W, H, metrics, cameraY) {
   baseX = charBaseX;
   const baseY = metrics.shorelineY + metrics.tileH * 0.2 - destH;
   const drawY = baseY + cameraY;
+
+  drawCharacterPlatform(charBaseX, destW, drawY + destH, metrics);
 
   if (sprite.image) {
     const index = Math.max(0, Math.min(sprite.frameCount - 1, Math.floor(sprite.currentFrame)));
@@ -177,13 +195,35 @@ function drawFishingLine(ax, ay, bx, by) {
 // 찌 그리기
 function drawBobber(x, y) {
   ctx.fillStyle = '#ef4444';
-  ctx.beginPath(); 
-  ctx.arc(x, y, 7, 0, Math.PI * 2); 
+  ctx.beginPath();
+  ctx.arc(x, y, 7, 0, Math.PI * 2);
   ctx.fill();
   ctx.fillStyle = '#ffffff';
-  ctx.beginPath(); 
-  ctx.arc(x, y - 2, 3, 0, Math.PI * 2); 
+  ctx.beginPath();
+  ctx.arc(x, y - 2, 3, 0, Math.PI * 2);
   ctx.fill();
+}
+
+function drawBobberWaveEffect(W, metrics, lateralScale) {
+  const effect = waveEffect;
+  if (!effect || !effect.playing || !effect.image) return;
+  const frameW = effect.frameWidth || Math.floor(effect.image.width / Math.max(1, effect.frameCount));
+  const frameH = effect.frameHeight || effect.image.height;
+  if (!frameW || !frameH) return;
+  const frameIndex = Math.max(0, Math.min(effect.frameCount - 1, Math.floor(effect.frameIndex)));
+  const sx = frameIndex * frameW;
+  const distancePx = effect.distance * metrics.pxPerMeter;
+  const worldY = metrics.waterSurfaceY - distancePx;
+  const screenY = worldY + camera.y;
+  const lateral = effect.lateral || 0;
+  const screenX = W * 0.5 + metrics.bobberOffsetX + lateral * lateralScale;
+  const scale = Math.min(1.45, Math.max(0.6, (metrics.tileW * 1.2) / Math.max(1, frameW)));
+  const destW = frameW * scale;
+  const destH = frameH * scale;
+  ctx.save();
+  ctx.globalAlpha = 0.85;
+  ctx.drawImage(effect.image, sx, 0, frameW, frameH, screenX - destW / 2, screenY - destH / 2, destW, destH);
+  ctx.restore();
 }
 
 // 카메라 업데이트

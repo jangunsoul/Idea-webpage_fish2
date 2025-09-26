@@ -134,7 +134,13 @@ function updateFishSimulation(dt) {
     if (typeof fish.stressLevel !== 'number') fish.stressLevel = 0;
     if (typeof fish.personalityFactor !== 'number') fish.personalityFactor = rand(0.8, 1.2);
     if (typeof fish.escapeTimer !== 'number') fish.escapeTimer = 0;
-    
+    if (!Number.isFinite(fish.homeY)) {
+      fish.homeY = Number.isFinite(fish.distance) ? fish.distance : (fish.position?.y ?? window.world?.bobberDist ?? 30);
+    }
+    if (!Number.isFinite(fish.verticalRange)) {
+      fish.verticalRange = window.FISH_VERTICAL_HOME_RANGE ?? 32;
+    }
+
     fish.escapeTimer = Math.max(0, fish.escapeTimer - dt);
     
     // 찌와의 거리에 따른 스트레스 계산
@@ -186,6 +192,14 @@ function updateFishSimulation(dt) {
       const normalizedX = clamp(fish.position.x / lateralSpan, -1, 1);
       finalX += -normalizedX * centerStrength * (1.2 + Math.abs(normalizedX) * 1.1);
 
+      const homeY = fish.homeY ?? fish.position.y ?? fish.distance ?? world.bobberDist ?? 30;
+      const baseVerticalRange = fish.verticalRange ?? (window.FISH_VERTICAL_HOME_RANGE ?? 32);
+      const escapeMultiplier = fish.escapeTimer > 0 ? (window.FISH_VERTICAL_ESCAPE_MULT ?? 1.9) : 1;
+      const allowedRange = Math.max(4, baseVerticalRange * escapeMultiplier);
+      const verticalOffset = (fish.position?.y ?? homeY) - homeY;
+      const normalizedY = clamp(verticalOffset / allowedRange, -1, 1);
+      finalY += -normalizedY * (fish.escapeTimer > 0 ? 0.6 : 1.1);
+
       // 속도 정규화 및 적용
       const magnitude = Math.sqrt(finalX * finalX + finalY * finalY);
       if (magnitude > 0.1) {
@@ -218,8 +232,18 @@ function updateFishSimulation(dt) {
     // 경계 처리
     let clamped = false;
     let horizontalBounce = false;
-    if (fish.position.y < 30) { fish.position.y = 30; clamped = true; }
-    if (fish.position.y > 200) { fish.position.y = 200; clamped = true; }
+    const globalMinY = 30;
+    const globalMaxY = 200;
+    const computedHomeY = fish.homeY ?? fish.position.y ?? fish.distance ?? globalMinY;
+    const clampedHomeY = clamp(computedHomeY, globalMinY, globalMaxY);
+    fish.homeY = clampedHomeY;
+    const baseVerticalRange = fish.verticalRange ?? (window.FISH_VERTICAL_HOME_RANGE ?? 32);
+    const escapeMultiplier = fish.escapeTimer > 0 ? (window.FISH_VERTICAL_ESCAPE_MULT ?? 1.9) : 1;
+    const permittedRange = Math.max(8, baseVerticalRange * escapeMultiplier);
+    const minY = clamp(clampedHomeY - permittedRange, globalMinY, globalMaxY);
+    const maxY = clamp(clampedHomeY + permittedRange, globalMinY, globalMaxY);
+    if (fish.position.y < minY) { fish.position.y = minY; clamped = true; }
+    if (fish.position.y > maxY) { fish.position.y = maxY; clamped = true; }
     const lateralLimit = Math.max(1, world.lateralLimit || 5);
     if (fish.position.x < -lateralLimit) { fish.position.x = -lateralLimit; clamped = true; horizontalBounce = true; }
     if (fish.position.x > lateralLimit) { fish.position.x = lateralLimit; clamped = true; horizontalBounce = true; }
