@@ -162,7 +162,8 @@ window.world = {
   autoMode: false,
   autoHoldActive: false,
   autoCastTimer: 0,
-  autoReleaseDelay: 0
+  autoReleaseDelay: 0,
+  autoTargetDistance: null
 };
 
 window.camera = { y: 0 };

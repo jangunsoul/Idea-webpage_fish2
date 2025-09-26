@@ -15,6 +15,7 @@
     summaryTotal: null,
     summaryClose: null,
     nextCountdownLabel: null,
+    summaryCountdownLabel: null,
     queue: [],
     index: -1,
     results: [],
@@ -22,9 +23,11 @@
     totalPoints: 0,
     redWidth: 0.22,
     finalWhite: 0.22,
-    duration: 4.2,
+    duration: 2.6,
     autoAdvanceTimer: 0,
-    autoAdvanceActive: false
+    autoAdvanceActive: false,
+    summaryCountdownTimer: 0,
+    summaryCountdownActive: false
   };
 
   function ensureDomReferences() {
@@ -67,7 +70,7 @@
     reelBattle.summaryTotal = document.getElementById('summaryTotal');
     reelBattle.summaryClose = document.getElementById('summaryClose');
     reelBattle.nextCountdownLabel = document.getElementById('battleNextCountdown');
-
+    reelBattle.summaryCountdownLabel = document.getElementById('summaryCountdown');
     updateAutoButtonUI();
 
     if (!window.canvas || !window.ctx || !window.startBtn || !window.mainMenu) {
@@ -370,12 +373,96 @@
     }
   }
 
+  function clearSummaryCountdown() {
+    reelBattle.summaryCountdownActive = false;
+    reelBattle.summaryCountdownTimer = 0;
+    if (reelBattle.summaryCountdownLabel) {
+      reelBattle.summaryCountdownLabel.textContent = '';
+      reelBattle.summaryCountdownLabel.classList.remove('show');
+    }
+  }
+
+  function startSummaryCountdown() {
+    reelBattle.summaryCountdownTimer = 2;
+    reelBattle.summaryCountdownActive = true;
+    if (reelBattle.summaryCountdownLabel) {
+      reelBattle.summaryCountdownLabel.textContent = '2.0s';
+      reelBattle.summaryCountdownLabel.classList.add('show');
+    }
+  }
+
   function updateAutoButtonUI() {
     if (!window.autoBtn) return;
     const active = !!window.world.autoMode;
     window.autoBtn.classList.toggle('active', active);
     window.autoBtn.setAttribute('aria-pressed', active ? 'true' : 'false');
     window.autoBtn.textContent = active ? 'Auto On' : 'Auto';
+  }
+
+  function computeAutoTargetDistance() {
+    const min = TARGET_MIN_DISTANCE;
+    const max = TARGET_MAX_DISTANCE;
+    const fishes = window.world.fishes;
+    if (!Array.isArray(fishes) || !fishes.length) {
+      return window.rand(min + 4, max - 6);
+    }
+
+    const bucketSize = 8;
+    const rarityPriority = window.RARITY_PRIORITY || {};
+    const buckets = new Map();
+
+    for (const fish of fishes) {
+      if (!fish || fish.finished) continue;
+      const distRaw = fish.position?.y ?? fish.distance ?? min;
+      const dist = window.clamp(distRaw, min, max);
+      const bucketIndex = Math.max(0, Math.floor((dist - min) / bucketSize));
+      const rarity = fish.spec?.rarity || 'Common';
+      const priority = rarityPriority[rarity] ?? 0;
+      const weight = 1 + priority * 0.25 + Math.min(1.2, Math.max(0, (fish.schoolSize ?? 1) * 0.12));
+      buckets.set(bucketIndex, (buckets.get(bucketIndex) || 0) + weight);
+    }
+
+    if (!buckets.size) {
+      return window.rand(min + 4, max - 6);
+    }
+
+    const sorted = [...buckets.entries()].sort((a, b) => b[1] - a[1]);
+    const topScore = sorted[0][1];
+    const viable = sorted.filter(([, score]) => score >= topScore * 0.55);
+    const pool = viable.length ? viable : sorted;
+    const total = pool.reduce((sum, [, score]) => sum + score, 0);
+    let pickRoll = Math.random() * (total || 1);
+    let chosen = pool[0];
+    for (const entry of pool) {
+      pickRoll -= entry[1];
+      if (pickRoll <= 0) {
+        chosen = entry;
+        break;
+      }
+    }
+
+    const bucketIndex = chosen?.[0] ?? 0;
+    const bucketStart = min + bucketIndex * bucketSize;
+    const bucketEnd = Math.min(max, bucketStart + bucketSize);
+    const span = Math.max(1.5, bucketEnd - bucketStart);
+    const innerStart = window.clamp(bucketStart + span * 0.2, min, max);
+    const innerEnd = window.clamp(bucketEnd - span * 0.2, min, max);
+    const base = innerEnd > innerStart ? window.rand(innerStart, innerEnd) : (bucketStart + bucketEnd) / 2;
+    const jitter = window.rand(-Math.min(2.2, span * 0.25), Math.min(2.2, span * 0.25));
+    let target = base + jitter;
+    if (Math.random() < 0.12) {
+      target = window.rand(min + 6, max - 6);
+    }
+    return window.clamp(target, min + 1, max - 1);
+  }
+
+  function computeAutoReleaseDelay(distance) {
+    const min = TARGET_MIN_DISTANCE;
+    const max = TARGET_MAX_DISTANCE;
+    const range = Math.max(1, max - min);
+    const ratio = window.clamp((distance - min) / range, 0, 1);
+    const base = 0.85 + ratio * 1.25;
+    return window.clamp(base + window.rand(-0.05, 0.22), 0.75, 2.6);
   }
 
   function scheduleAutoCast(delay = 0.45) {
@@ -386,10 +473,13 @@
     if (!target) return;
     window.world.autoCastTimer = Math.max(0, delay);
     window.world.autoHoldActive = false;
-    window.world.autoReleaseDelay = window.rand(0.55, 0.85);
+    const desiredDistance = computeAutoTargetDistance();
+    window.world.autoTargetDistance = desiredDistance;
+    window.world.autoReleaseDelay = computeAutoReleaseDelay(desiredDistance);
     target.holding = false;
     target.holdTime = 0;
     target.velocity = 0;
+    target.reachedTop = false;
     setCastPrompt(true, 'Auto casting...');
   }
 
@@ -405,6 +495,7 @@
     if (!next) {
       window.world.autoCastTimer = 0;
       window.world.autoReleaseDelay = 0;
+      window.world.autoTargetDistance = null;
       if (window.world.targetCircle) {
         window.world.targetCircle.holding = false;
       }
@@ -420,7 +511,8 @@
   function updateAutoPlay(dt) {
     if (!window.world.autoMode) return;
     if (window.state !== window.GameState.Targeting) return;
-    if (window.world.castStage === 'aiming') {
+    const stage = window.world.castStage;
+    if (stage === 'aiming') {
       const target = window.world.targetCircle;
       if (!target) return;
       if (!window.world.autoHoldActive) {
@@ -429,17 +521,38 @@
           if (!target.holding) {
             handlePointerDown();
           }
-          window.world.autoHoldActive = true;
-          window.world.autoReleaseDelay = window.rand(0.6, 0.9);
+          if (target.holding) {
+            window.world.autoHoldActive = true;
+            if (!Number.isFinite(window.world.autoTargetDistance)) {
+              const desired = computeAutoTargetDistance();
+              window.world.autoTargetDistance = desired;
+              window.world.autoReleaseDelay = computeAutoReleaseDelay(desired);
+            } else if (!Number.isFinite(window.world.autoReleaseDelay) || window.world.autoReleaseDelay <= 0) {
+              window.world.autoReleaseDelay = computeAutoReleaseDelay(window.world.autoTargetDistance);
+            }
+          }
         }
-      } else {
-        const desiredDistance = TARGET_MAX_DISTANCE - 2;
-        if (target.distance >= desiredDistance || target.holdTime >= window.world.autoReleaseDelay) {
-          if (target.holding) handlePointerUp();
+      } else if (target.holding) {
+        if (!Number.isFinite(window.world.autoTargetDistance)) {
+          window.world.autoTargetDistance = computeAutoTargetDistance();
+        }
+        if (!Number.isFinite(window.world.autoReleaseDelay) || window.world.autoReleaseDelay <= 0) {
+          window.world.autoReleaseDelay = computeAutoReleaseDelay(window.world.autoTargetDistance);
+        }
+        const desiredDistance = window.world.autoTargetDistance ?? TARGET_MAX_DISTANCE - 3;
+        const tolerance = 1.5 + Math.abs(target.velocity || 0) * 0.04;
+        if (
+          target.distance >= desiredDistance - tolerance ||
+          target.reachedTop ||
+          target.holdTime >= window.world.autoReleaseDelay
+        ) {
+          handlePointerUp();
           window.world.autoHoldActive = false;
         }
+      } else {
+        window.world.autoHoldActive = false;
       }
-    } else if (window.world.castStage !== 'sinking') {
+    } else if (stage !== 'sinking') {
       window.world.autoHoldActive = false;
     }
   }
@@ -451,10 +564,12 @@
     reelBattle.state = null;
     reelBattle.totalPoints = 0;
     clearNextBattleCountdown();
+    clearSummaryCountdown();
     window.world.battleQueue = [];
     window.world.battleResults = [];
     window.world.currentBattleIndex = -1;
     window.world.pendingPointTotal = 0;
+    window.world.autoTargetDistance = null;
     if (hideModals) {
       setModalVisibility(reelBattle.modal, false);
       setModalVisibility(reelBattle.summaryModal, false);
@@ -633,7 +748,7 @@
       fishPos: 0.5,
       fishDirection: -1,
       fishPhase: Math.random() * Math.PI * 2,
-      fishSpeed: 3 + Math.random() * 1.8,
+      fishSpeed: 4.2 + Math.random() * 2.2,
       success: candidate.success,
       resolved: false,
       failTriggered: false,
@@ -699,8 +814,22 @@
   }
 
   function updateReelBattle(dt) {
+    const summaryVisible = reelBattle.summaryModal?.style.display === 'flex';
+    if (reelBattle.summaryCountdownActive) {
+      reelBattle.summaryCountdownTimer = Math.max(0, reelBattle.summaryCountdownTimer - dt);
+      if (reelBattle.summaryCountdownLabel) {
+        const seconds = Math.max(0, reelBattle.summaryCountdownTimer);
+        reelBattle.summaryCountdownLabel.textContent = `${seconds.toFixed(1)}s`;
+      }
+      if (reelBattle.summaryCountdownTimer <= 0 && summaryVisible) {
+        reelBattle.summaryCountdownActive = false;
+        closeCatchSummary();
+        return;
+      }
+    }
+
     const state = reelBattle.state;
-    if (!state || !reelBattle.modal || reelBattle.summaryModal?.style.display === 'flex') return;
+    if (!state || !reelBattle.modal || summaryVisible) return;
     const previousPos = state.fishPos;
     state.elapsed = Math.min(state.elapsed + dt, state.duration + 0.6);
     const t = window.clamp(state.elapsed / state.duration, 0, 1);
@@ -719,11 +848,11 @@
       state.fishPos = 0.5 + Math.sin(state.fishPhase) * amp;
       state.fishPos = window.clamp(state.fishPos, whiteLeft + 0.02, whiteLeft + currentWidth - 0.02);
     } else {
-      if (!state.failTriggered && state.elapsed > state.duration * 0.55) {
+      if (!state.failTriggered && state.elapsed > state.duration * 0.45) {
         state.failTriggered = true;
       }
       if (state.failTriggered) {
-        state.fishPos += state.failDirection * dt * 0.35;
+        state.fishPos += state.failDirection * dt * 0.55;
       } else {
         const amp = Math.max(0.02, safeAmplitude * 0.8);
         state.fishPos = 0.5 + Math.sin(state.fishPhase) * amp;
@@ -811,9 +940,11 @@
       reelBattle.summaryTotal.textContent = reelBattle.totalPoints.toLocaleString();
     }
     setModalVisibility(reelBattle.summaryModal, true);
+    startSummaryCountdown();
   }
 
   function closeCatchSummary() {
+    clearSummaryCountdown();
     const total = reelBattle.totalPoints;
     setModalVisibility(reelBattle.summaryModal, false);
     if (total > 0) {
@@ -871,6 +1002,10 @@
     window.world.viewZoom = 1;
     window.world.bobberVisible = false;
     resetReelBattle();
+    window.world.autoTargetDistance = null;
+    window.world.autoCastTimer = 0;
+    window.world.autoHoldActive = false;
+    window.world.autoReleaseDelay = 0;
     if (window.waveEffect) {
       window.waveEffect.playing = false;
       window.waveEffect.frameIndex = 0;
