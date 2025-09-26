@@ -14,6 +14,7 @@
     summaryList: null,
     summaryTotal: null,
     summaryClose: null,
+    nextCountdownLabel: null,
     queue: [],
     index: -1,
     results: [],
@@ -21,7 +22,9 @@
     totalPoints: 0,
     redWidth: 0.22,
     finalWhite: 0.22,
-    duration: 4.2
+    duration: 4.2,
+    autoAdvanceTimer: 0,
+    autoAdvanceActive: false
   };
 
   function ensureDomReferences() {
@@ -32,6 +35,7 @@
     window.titleBar = document.getElementById('titleBar');
     window.navBar = document.getElementById('navBar');
     window.exitBtn = document.getElementById('exitBtn');
+    window.autoBtn = document.getElementById('autoBtn');
     window.shopBtn = document.getElementById('shopBtn');
     window.rankBtn = document.getElementById('rankBtn');
     window.premiumBtn = document.getElementById('premiumBtn');
@@ -62,6 +66,9 @@
     reelBattle.summaryList = document.getElementById('summaryList');
     reelBattle.summaryTotal = document.getElementById('summaryTotal');
     reelBattle.summaryClose = document.getElementById('summaryClose');
+    reelBattle.nextCountdownLabel = document.getElementById('battleNextCountdown');
+
+    updateAutoButtonUI();
 
     if (!window.canvas || !window.ctx || !window.startBtn || !window.mainMenu) {
       throw new Error('Essential DOM elements are missing.');
@@ -345,12 +352,105 @@
     element.setAttribute('aria-hidden', visible ? 'false' : 'true');
   }
 
+  function clearNextBattleCountdown() {
+    reelBattle.autoAdvanceActive = false;
+    reelBattle.autoAdvanceTimer = 0;
+    if (reelBattle.nextCountdownLabel) {
+      reelBattle.nextCountdownLabel.textContent = '';
+      reelBattle.nextCountdownLabel.classList.remove('show');
+    }
+  }
+
+  function startNextBattleCountdown() {
+    reelBattle.autoAdvanceTimer = 2;
+    reelBattle.autoAdvanceActive = true;
+    if (reelBattle.nextCountdownLabel) {
+      reelBattle.nextCountdownLabel.textContent = '2.0s';
+      reelBattle.nextCountdownLabel.classList.add('show');
+    }
+  }
+
+  function updateAutoButtonUI() {
+    if (!window.autoBtn) return;
+    const active = !!window.world.autoMode;
+    window.autoBtn.classList.toggle('active', active);
+    window.autoBtn.setAttribute('aria-pressed', active ? 'true' : 'false');
+    window.autoBtn.textContent = active ? 'Auto On' : 'Auto';
+  }
+
+  function scheduleAutoCast(delay = 0.45) {
+    if (!window.world.autoMode) return;
+    if (window.state !== window.GameState.Targeting) return;
+    if (window.world.castStage !== 'aiming') return;
+    const target = window.world.targetCircle;
+    if (!target) return;
+    window.world.autoCastTimer = Math.max(0, delay);
+    window.world.autoHoldActive = false;
+    window.world.autoReleaseDelay = window.rand(0.55, 0.85);
+    target.holding = false;
+    target.holdTime = 0;
+    target.velocity = 0;
+    setCastPrompt(true, 'Auto casting...');
+  }
+
+  function setAutoMode(enabled, schedule = true) {
+    const next = !!enabled;
+    if (window.world.autoMode === next) {
+      if (next && schedule) scheduleAutoCast(window.rand(0.3, 0.6));
+      updateAutoButtonUI();
+      return;
+    }
+    window.world.autoMode = next;
+    window.world.autoHoldActive = false;
+    if (!next) {
+      window.world.autoCastTimer = 0;
+      window.world.autoReleaseDelay = 0;
+      if (window.world.targetCircle) {
+        window.world.targetCircle.holding = false;
+      }
+      if (window.state === window.GameState.Targeting && window.world.castStage === 'aiming') {
+        setCastPrompt(true, 'Press the Screen to cast the bobber');
+      }
+    } else if (schedule) {
+      scheduleAutoCast(window.rand(0.3, 0.6));
+    }
+    updateAutoButtonUI();
+  }
+
+  function updateAutoPlay(dt) {
+    if (!window.world.autoMode) return;
+    if (window.state !== window.GameState.Targeting) return;
+    if (window.world.castStage === 'aiming') {
+      const target = window.world.targetCircle;
+      if (!target) return;
+      if (!window.world.autoHoldActive) {
+        window.world.autoCastTimer -= dt;
+        if (window.world.autoCastTimer <= 0) {
+          if (!target.holding) {
+            handlePointerDown();
+          }
+          window.world.autoHoldActive = true;
+          window.world.autoReleaseDelay = window.rand(0.6, 0.9);
+        }
+      } else {
+        const desiredDistance = TARGET_MAX_DISTANCE - 2;
+        if (target.distance >= desiredDistance || target.holdTime >= window.world.autoReleaseDelay) {
+          if (target.holding) handlePointerUp();
+          window.world.autoHoldActive = false;
+        }
+      }
+    } else if (window.world.castStage !== 'sinking') {
+      window.world.autoHoldActive = false;
+    }
+  }
+
   function resetReelBattle(hideModals = true) {
     reelBattle.queue = [];
     reelBattle.index = -1;
     reelBattle.results = [];
     reelBattle.state = null;
     reelBattle.totalPoints = 0;
+    clearNextBattleCountdown();
     window.world.battleQueue = [];
     window.world.battleResults = [];
     window.world.currentBattleIndex = -1;
@@ -368,7 +468,7 @@
     }
     if (reelBattle.fishImage) {
       reelBattle.fishImage.innerHTML = '';
-      reelBattle.fishImage.classList.remove('celebrate');
+      reelBattle.fishImage.classList.remove('celebrate', 'flip');
       reelBattle.fishImage.style.transform = '';
     }
     if (reelBattle.white) {
@@ -388,7 +488,7 @@
     if (!reelBattle.fishImage) return;
     const container = reelBattle.fishImage;
     container.innerHTML = '';
-    container.classList.remove('celebrate');
+    container.classList.remove('celebrate', 'flip');
     container.style.transform = 'translate(-50%, -50%)';
     if (!fish) {
       const placeholder = document.createElement('div');
@@ -484,6 +584,7 @@
   }
 
   function beginNextReelBattle() {
+    clearNextBattleCountdown();
     reelBattle.index += 1;
     window.world.currentBattleIndex = reelBattle.index;
     if (reelBattle.index >= reelBattle.queue.length) {
@@ -520,6 +621,7 @@
       reelBattle.nextBtn.classList.add('disabled');
       reelBattle.nextBtn.textContent = 'Next';
     }
+    clearNextBattleCountdown();
     setModalVisibility(reelBattle.modal, true);
     reelBattle.state = {
       candidate,
@@ -529,6 +631,7 @@
       finalWhite: reelBattle.finalWhite,
       currentWidth: 1,
       fishPos: 0.5,
+      fishDirection: -1,
       fishPhase: Math.random() * Math.PI * 2,
       fishSpeed: 3 + Math.random() * 1.8,
       success: candidate.success,
@@ -587,11 +690,18 @@
       reelBattle.nextBtn.disabled = false;
       reelBattle.nextBtn.classList.remove('disabled');
     }
+    const hasMore = reelBattle.index < reelBattle.queue.length - 1;
+    if (hasMore) {
+      startNextBattleCountdown();
+    } else {
+      clearNextBattleCountdown();
+    }
   }
 
   function updateReelBattle(dt) {
     const state = reelBattle.state;
     if (!state || !reelBattle.modal || reelBattle.summaryModal?.style.display === 'flex') return;
+    const previousPos = state.fishPos;
     state.elapsed = Math.min(state.elapsed + dt, state.duration + 0.6);
     const t = window.clamp(state.elapsed / state.duration, 0, 1);
     const eased = t * t * (3 - 2 * t);
@@ -619,6 +729,11 @@
         state.fishPos = 0.5 + Math.sin(state.fishPhase) * amp;
       }
     }
+    const delta = state.fishPos - previousPos;
+    if (Math.abs(delta) > 0.0005) {
+      state.fishDirection = delta > 0 ? 1 : -1;
+    }
+    const facingRight = state.fishDirection > 0;
     const trackWidth = reelBattle.white?.parentElement?.clientWidth || 0;
     if (reelBattle.marker) {
       reelBattle.marker.style.left = `${state.fishPos * 100}%`;
@@ -626,6 +741,9 @@
     if (reelBattle.fishImage && trackWidth) {
       const offset = (state.fishPos - 0.5) * trackWidth;
       reelBattle.fishImage.style.transform = `translate(-50%, -50%) translateX(${offset}px)`;
+      reelBattle.fishImage.classList.toggle('flip', facingRight);
+    } else if (reelBattle.fishImage) {
+      reelBattle.fishImage.classList.toggle('flip', facingRight);
     }
     const whiteRight = whiteLeft + currentWidth;
     const redLeft = 0.5 - state.redWidth / 2;
@@ -641,6 +759,21 @@
       }
       if (state.elapsed >= state.duration + 0.5 && !state.resolved) {
         resolveReelBattleOutcome(state.success);
+      }
+    }
+    if (reelBattle.autoAdvanceActive) {
+      reelBattle.autoAdvanceTimer = Math.max(0, reelBattle.autoAdvanceTimer - dt);
+      if (reelBattle.nextCountdownLabel) {
+        const seconds = Math.max(0, reelBattle.autoAdvanceTimer);
+        reelBattle.nextCountdownLabel.textContent = `${seconds.toFixed(1)}s`;
+      }
+      if (reelBattle.autoAdvanceTimer <= 0) {
+        clearNextBattleCountdown();
+        if (reelBattle.state && reelBattle.state.resolved) {
+          reelBattle.state = null;
+        }
+        beginNextReelBattle();
+        return;
       }
     }
   }
@@ -771,9 +904,13 @@
     if (window.distanceEl) window.distanceEl.style.display = 'block';
     setCastPrompt(true, 'Press the Screen to cast the bobber');
     resetCharacterToIdle();
+    if (window.world.autoMode) {
+      scheduleAutoCast(window.rand(0.3, 0.6));
+    }
   }
 
   function exitToMenu() {
+    setAutoMode(false, false);
     window.state = window.GameState.Idle;
     window.camera.y = 0;
     setCastPrompt(false);
@@ -1398,6 +1535,7 @@
     updateFishSimulation(dt);
     updateBobberWave(dt);
     updateReelBattle(dt);
+    updateAutoPlay(dt);
 
     const metrics = getEnvironmentMetrics(window.canvas.width, window.canvas.height);
     if (window.state === window.GameState.Targeting) {
@@ -1477,6 +1615,7 @@
     if (reelBattle.nextBtn) {
       reelBattle.nextBtn.addEventListener('click', () => {
         if (!reelBattle.state || !reelBattle.state.resolved) return;
+        clearNextBattleCountdown();
         reelBattle.state = null;
         beginNextReelBattle();
       });
@@ -1495,6 +1634,27 @@
     if (window.exitBtn) {
       window.exitBtn.addEventListener('click', () => {
         exitToMenu();
+      });
+    }
+
+    if (window.autoBtn) {
+      window.autoBtn.addEventListener('click', () => {
+        if (!window.dataLoaded || !window.assetsReady) {
+          window.toast('Load the data first.');
+          return;
+        }
+        if (!window.world.autoMode) {
+          if (window.state === window.GameState.Idle) {
+            if (window.settings.energy <= 0) {
+              window.toast('Not enough energy.');
+              return;
+            }
+            startPlaySession();
+          }
+          setAutoMode(true);
+        } else {
+          setAutoMode(false);
+        }
       });
     }
   }

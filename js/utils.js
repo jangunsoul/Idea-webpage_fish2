@@ -110,5 +110,10 @@ window.setGameplayLayout = function setGameplayLayout(active) {
     window.exitBtn.setAttribute('aria-hidden', active ? 'false' : 'true');
     window.exitBtn.tabIndex = active ? 0 : -1;
   }
+
+  if (window.autoBtn) {
+    window.autoBtn.setAttribute('aria-hidden', active ? 'false' : 'true');
+    window.autoBtn.tabIndex = active ? 0 : -1;
+  }
 };
 
