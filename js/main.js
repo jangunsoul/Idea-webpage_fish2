@@ -700,11 +700,14 @@
     return window.mmCells;
   }
 
-  function clearMinimap() {
+  function clearMinimap(hideContainer = false) {
     const cells = ensureMinimapStructure();
     if (cells) cells.innerHTML = '';
     if (window.mmViewport) window.mmViewport.style.opacity = '0';
     if (window.mmIndicator) window.mmIndicator.style.opacity = '0';
+    if (hideContainer && window.minimap) {
+      window.minimap.style.display = 'none';
+    }
   }
 
   function updateMinimap(metrics = window.latestMetrics) {
@@ -713,12 +716,12 @@
     if (!cells) return;
 
     if (window.state !== window.GameState.Targeting) {
-      clearMinimap();
+      clearMinimap(true);
       return;
     }
 
     if (!Array.isArray(window.world.fishes) || !window.world.fishes.length) {
-      clearMinimap();
+      clearMinimap(true);
       return;
     }
 
@@ -729,32 +732,49 @@
     const minDist = window.MIN_CAST_DISTANCE ?? 0;
     const maxDist = window.MAX_CAST_DISTANCE ?? (window.settings?.maxCast ?? minDist + 1);
     const range = Math.max(1, maxDist - minDist);
-    const segments = Math.max(8, window.MINIMAP_SEGMENTS ?? 48);
+    const baseSegmentSize = Math.max(1, window.MINIMAP_SEGMENT_METERS || 5);
+    const targetSegments = Math.max(1, Math.ceil(range / baseSegmentSize));
+    const maxSegments = Math.max(8, window.MINIMAP_SEGMENTS || targetSegments);
+    const segments = Math.max(8, Math.min(maxSegments, targetSegments));
+    const segmentMeters = Math.max(range / segments, 1);
 
-    const counts = new Array(segments).fill(0);
-    const engagedCounts = new Array(segments).fill(0);
+    const rarityEntries = new Array(segments).fill(null);
+    const engagedSegments = new Array(segments).fill(false);
+    const priorityMap = window.RARITY_PRIORITY || {};
+    const colorMap = window.RARITY_COLORS || {};
 
     for (const fish of window.world.fishes) {
       if (!fish || fish.finished) continue;
       const dist = clamp(fish.position?.y ?? fish.distance ?? minDist, minDist, maxDist);
-      const ratio = (dist - minDist) / range;
-      const index = Math.min(segments - 1, Math.max(0, Math.floor(ratio * segments)));
-      counts[index] += 1;
-      if (fish.engaged) engagedCounts[index] += 1;
+      const index = Math.min(segments - 1, Math.max(0, Math.floor((dist - minDist) / segmentMeters)));
+      const rarity = fish.spec?.rarity || 'Common';
+      const priority = priorityMap[rarity] ?? 0;
+      const existing = rarityEntries[index];
+      if (!existing || priority > existing.priority) {
+        rarityEntries[index] = { rarity, priority, color: colorMap[rarity] };
+      }
+      if (fish.engaged) engagedSegments[index] = true;
     }
 
-    const maxCount = counts.reduce((max, value) => Math.max(max, value), 0);
     cells.innerHTML = '';
 
     const fragment = document.createDocumentFragment();
     for (let i = segments - 1; i >= 0; i--) {
       const cell = document.createElement('div');
       cell.className = 'mmcell';
-      const intensity = maxCount > 0 ? counts[i] / maxCount : 0;
-      const hue = 205 - intensity * 70;
-      const lightness = 18 + intensity * 45;
-      cell.style.background = `hsl(${hue}, 82%, ${lightness}%)`;
-      if (engagedCounts[i] > 0) {
+      const entry = rarityEntries[i];
+      if (entry && entry.color) {
+        const color = entry.color;
+        cell.style.background = `linear-gradient(180deg, ${color}cc 0%, ${color}99 100%)`;
+        cell.style.opacity = '1';
+      } else if (entry) {
+        cell.style.background = 'rgba(30, 64, 175, 0.55)';
+        cell.style.opacity = '0.9';
+      } else {
+        cell.style.background = 'rgba(15, 23, 42, 0.7)';
+        cell.style.opacity = '0.45';
+      }
+      if (engagedSegments[i]) {
         cell.style.boxShadow = 'inset 0 0 6px rgba(111, 255, 233, 0.55)';
       }
       fragment.appendChild(cell);

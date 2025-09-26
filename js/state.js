@@ -23,10 +23,28 @@ window.RARITY_WEIGHTS = {
   Mythic: 1
 };
 
+window.RARITY_PRIORITY = {
+  Common: 0,
+  Uncommon: 1,
+  Rare: 2,
+  Epic: 3,
+  Legendary: 4,
+  Mythic: 5
+};
+
+window.RARITY_COLORS = {
+  Common: '#1d4ed8',
+  Uncommon: '#10b981',
+  Rare: '#8b5cf6',
+  Epic: '#f97316',
+  Legendary: '#facc15',
+  Mythic: '#f472b6'
+};
+
 window.FISH_SWIM_SPEED_TABLE = {
-  Fast: 12,
-  Normal: 8,
-  Slow: 5
+  Fast: 8,
+  Normal: 5,
+  Slow: 3
 };
 
 window.DETECTION_RANGE_M = 5;
@@ -39,6 +57,7 @@ window.FISH_ALIGNMENT_FORCE = 0.45;
 window.FISH_WANDER_FORCE = 0.55;
 window.FISH_CENTERING_FORCE = 0.35;
 window.MINIMAP_SEGMENTS = 48;
+window.MINIMAP_SEGMENT_METERS = 5;
 
 window.loadingPromise = null;
 window.assetPrepPromise = null;

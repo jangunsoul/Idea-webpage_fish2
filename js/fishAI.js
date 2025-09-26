@@ -189,7 +189,7 @@ function updateFishSimulation(dt) {
       // 속도 정규화 및 적용
       const magnitude = Math.sqrt(finalX * finalX + finalY * finalY);
       if (magnitude > 0.1) {
-        const speed = (fish.swimSpeed || 8) * fish.personalityFactor * (0.8 + fish.stressLevel * 0.4);
+        const speed = (fish.swimSpeed || 8) * fish.personalityFactor * (0.6 + fish.stressLevel * 0.4);
         fish.targetVelocity.x = (finalX / magnitude) * speed;
         fish.targetVelocity.y = (finalY / magnitude) * speed * 0.7; // 수직 움직임 제한
         fish.moving = true;

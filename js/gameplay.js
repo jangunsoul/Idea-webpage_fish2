@@ -21,41 +21,63 @@ function spawnFishes(dist, options = {}) {
   const fishes = [];
   const minDistance = 30;
   const maxDistance = spread ? 200 : Math.min(dist + 20, 200);
-  const density = spread ? randi(24, 32) : randi(12, 18);
+  const segmentSize = Math.max(2, window.MINIMAP_SEGMENT_METERS || 5);
+  const fishMap = gameData?.resources?.fish;
 
-  const sampleDistance = () => {
-    const r = (Math.random() + Math.random()) * 0.5;
-    return clamp(minDistance + r * (maxDistance - minDistance), minDistance, maxDistance);
-  };
+  const sampleLateral = () => rand(-halfWidth, halfWidth);
 
-  const sampleLateral = () => {
-    const direction = Math.random() < 0.5 ? -1 : 1;
-    const magnitude = Math.pow(Math.random(), 1.8);
-    return clamp(direction * halfWidth * magnitude * 0.85, -halfWidth, halfWidth);
-  };
-
-  for (let i = 0; i < density; i++) {
+  const spawnAtDistance = distance => {
     const spec = sampleSpecies();
-    if (!spec) continue;
+    if (!spec) return;
 
     const size = rand(spec.size_cm.min, spec.size_cm.max);
     const weight = rand(spec.weight_kg.min, spec.weight_kg.max);
-    const distance = sampleDistance();
     const lateral = sampleLateral();
-
-    const fishMap = gameData?.resources?.fish;
     const cachedImage = fishMap?.get?.(spec.id);
 
     const fish = {
-      specId: spec.id, spec, distance, size_cm: size, weight_kg: weight, engaged: false, finished: false,
-      iconColor: spec.ui.mapColorHex, position: { x: lateral, y: distance },
-      velocity: { x: 0, y: 0 }, targetVelocity: { x: 0, y: 0 }, bonusMultiplier: 1,
-      escapeTimer: 0, lastCircleTime: -Infinity, renderCache: null, image: cachedImage || null, active: null,
-      stressLevel: 0, personalityFactor: rand(0.8, 1.2), moveBias: getFishMoveBias(spec),
+      specId: spec.id,
+      spec,
+      distance,
+      size_cm: size,
+      weight_kg: weight,
+      engaged: false,
+      finished: false,
+      iconColor: spec.ui.mapColorHex,
+      position: { x: lateral, y: distance },
+      velocity: { x: 0, y: 0 },
+      targetVelocity: { x: 0, y: 0 },
+      bonusMultiplier: 1,
+      escapeTimer: 0,
+      lastCircleTime: -Infinity,
+      renderCache: null,
+      image: cachedImage || null,
+      active: null,
+      stressLevel: 0,
+      personalityFactor: rand(0.8, 1.2),
+      moveBias: getFishMoveBias(spec),
       facingRight: Math.random() > 0.5,
       swimSpeed: getFishSwimSpeed(spec, weight)
     };
+
     fishes.push(fish);
+  };
+
+  if (spread) {
+    for (let base = minDistance; base <= maxDistance; base += segmentSize) {
+      const count = randi(3, 4);
+      for (let i = 0; i < count; i++) {
+        const offset = rand(-segmentSize * 0.45, segmentSize * 0.45);
+        const distance = clamp(base + offset, minDistance, maxDistance);
+        spawnAtDistance(distance);
+      }
+    }
+  } else {
+    const density = randi(12, 18);
+    for (let i = 0; i < density; i++) {
+      const distance = clamp(rand(minDistance, maxDistance), minDistance, maxDistance);
+      spawnAtDistance(distance);
+    }
   }
   
   // 보너스 물고기 설정
