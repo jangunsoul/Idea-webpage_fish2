@@ -21,14 +21,34 @@
     results: [],
     state: null,
     totalPoints: 0,
+    bonusEnergy: 0,
     redWidth: 0.22,
     finalWhite: 0.22,
     duration: 2.6,
     autoAdvanceTimer: 0,
     autoAdvanceActive: false,
+    autoAdvanceMode: 'next',
     summaryCountdownTimer: 0,
     summaryCountdownActive: false
   };
+
+  const FISH_TUG_MESSAGES = [
+    '물고기가 라인을 흔듭니다!',
+    '강하게 저항하고 있어요!',
+    '라인을 가로질러 빠져나가려 해요!'
+  ];
+
+  const PLAYER_TUG_MESSAGES = [
+    '라인을 힘껏 당깁니다!',
+    '낚싯대를 들어 올렸어요!',
+    '챔질에 성공했습니다!'
+  ];
+
+  const TREASURE_MESSAGES = [
+    '반짝이는 것이 보여요!',
+    '상자가 걸린 것 같아요!',
+    '보물의 무게가 전해집니다!'
+  ];
 
   function ensureDomReferences() {
     window.canvas = document.getElementById('view');
@@ -349,26 +369,43 @@
       .replace(/'/g, '&#39;');
   }
 
+  function pickMessage(list) {
+    if (!Array.isArray(list) || !list.length) return '';
+    const index = Math.floor(Math.random() * list.length);
+    return list[index];
+  }
+
   function setModalVisibility(element, visible) {
     if (!element) return;
     element.style.display = visible ? 'flex' : 'none';
     element.setAttribute('aria-hidden', visible ? 'false' : 'true');
   }
 
+  function setBattleStatusMessage(state, message, duration = 1.1) {
+    if (!reelBattle.status || !state || state.resolved) return;
+    if (typeof message !== 'string' || !message.trim()) return;
+    reelBattle.status.textContent = message;
+    reelBattle.status.classList.remove('success', 'fail');
+    state.statusTimer = Math.max(duration, 0);
+  }
+
   function clearNextBattleCountdown() {
     reelBattle.autoAdvanceActive = false;
     reelBattle.autoAdvanceTimer = 0;
+    reelBattle.autoAdvanceMode = 'next';
     if (reelBattle.nextCountdownLabel) {
       reelBattle.nextCountdownLabel.textContent = '';
       reelBattle.nextCountdownLabel.classList.remove('show');
     }
   }
 
-  function startNextBattleCountdown() {
+  function startNextBattleCountdown(mode = 'next') {
     reelBattle.autoAdvanceTimer = 2;
     reelBattle.autoAdvanceActive = true;
+    reelBattle.autoAdvanceMode = mode === 'summary' ? 'summary' : 'next';
     if (reelBattle.nextCountdownLabel) {
-      reelBattle.nextCountdownLabel.textContent = '2.0s';
+      const prefix = reelBattle.autoAdvanceMode === 'summary' ? 'Summary' : 'Next';
+      reelBattle.nextCountdownLabel.textContent = `${prefix} 2.0s`;
       reelBattle.nextCountdownLabel.classList.add('show');
     }
   }
@@ -386,7 +423,7 @@
     reelBattle.summaryCountdownTimer = 2;
     reelBattle.summaryCountdownActive = true;
     if (reelBattle.summaryCountdownLabel) {
-      reelBattle.summaryCountdownLabel.textContent = '2.0s';
+      reelBattle.summaryCountdownLabel.textContent = 'Close 2.0s';
       reelBattle.summaryCountdownLabel.classList.add('show');
     }
   }
@@ -470,7 +507,11 @@
     if (window.state !== window.GameState.Targeting) return;
     if (window.world.castStage !== 'aiming') return;
     const target = window.world.targetCircle;
-    if (!target) return;
+    if (!target) {
+      window.world.autoArmed = false;
+      return;
+    }
+    window.world.autoArmed = true;
     window.world.autoCastTimer = Math.max(0, delay);
     window.world.autoHoldActive = false;
     const desiredDistance = computeAutoTargetDistance();
@@ -483,7 +524,7 @@
     setCastPrompt(true, 'Auto casting...');
   }
 
-  function setAutoMode(enabled, schedule = true) {
+  function setAutoMode(enabled, schedule = false) {
     const next = !!enabled;
     if (window.world.autoMode === next) {
       if (next && schedule) scheduleAutoCast(window.rand(0.3, 0.6));
@@ -492,6 +533,7 @@
     }
     window.world.autoMode = next;
     window.world.autoHoldActive = false;
+    window.world.autoArmed = false;
     if (!next) {
       window.world.autoCastTimer = 0;
       window.world.autoReleaseDelay = 0;
@@ -513,6 +555,7 @@
     if (window.state !== window.GameState.Targeting) return;
     const stage = window.world.castStage;
     if (stage === 'aiming') {
+      if (!window.world.autoArmed) return;
       const target = window.world.targetCircle;
       if (!target) return;
       if (!window.world.autoHoldActive) {
@@ -554,6 +597,7 @@
       }
     } else if (stage !== 'sinking') {
       window.world.autoHoldActive = false;
+      window.world.autoArmed = false;
     }
   }
 
@@ -563,6 +607,7 @@
     reelBattle.results = [];
     reelBattle.state = null;
     reelBattle.totalPoints = 0;
+    reelBattle.bonusEnergy = 0;
     clearNextBattleCountdown();
     clearSummaryCountdown();
     window.world.battleQueue = [];
@@ -611,6 +656,15 @@
       container.appendChild(placeholder);
       return;
     }
+    if (fish.isTreasure) {
+      const chest = document.createElement('div');
+      chest.className = 'treasure-chest';
+      const sparkle = document.createElement('span');
+      sparkle.className = 'shine';
+      chest.appendChild(sparkle);
+      container.appendChild(chest);
+      return;
+    }
     const images = fish.spec?.images || {};
     const cache = window.gameData?.resources?.fish;
     const cachedImg = fish.image || cache?.get?.(fish.specId) || null;
@@ -643,6 +697,37 @@
     }
     fishes.sort((a, b) => a.dist - b.dist);
     return fishes.map(entry => entry.fish);
+  }
+
+  function createTreasureCandidate() {
+    const rewardType = Math.random() < 0.65 ? 'points' : 'energy';
+    const pointsAmount = Math.round(window.rand(140, 280));
+    const energyAmount = Math.random() < 0.4 ? 2 : 1;
+    const fish = {
+      isTreasure: true,
+      spec: {
+        displayName: '보물 상자',
+        rarity: rewardType === 'points' ? '희귀' : '에너지',
+        images: {}
+      },
+      size_cm: 0,
+      weight_kg: 0,
+      rewardType,
+      rewardAmount: rewardType === 'points' ? pointsAmount : energyAmount
+    };
+
+    return {
+      type: 'treasure',
+      fish,
+      chance: 1,
+      success: true,
+      resolved: false,
+      points: rewardType === 'points' ? pointsAmount : 0,
+      treasure: {
+        type: rewardType,
+        amount: rewardType === 'points' ? pointsAmount : energyAmount
+      }
+    };
   }
 
   function computeBattleChance(fish, candidateCount) {
@@ -683,6 +768,14 @@
         points: 0
       };
     });
+    if (Math.random() < 0.05) {
+      const treasure = createTreasureCandidate();
+      const insertIndex = Math.min(
+        reelBattle.queue.length,
+        Math.floor(Math.random() * (reelBattle.queue.length + 1))
+      );
+      reelBattle.queue.splice(insertIndex, 0, treasure);
+    }
     reelBattle.index = -1;
     reelBattle.results = [];
     reelBattle.totalPoints = 0;
@@ -715,13 +808,18 @@
       return;
     }
     const fish = candidate.fish;
+    const baseStatus = candidate.type === 'treasure' ? '보물 상자를 끌어올리는 중...' : '줄을 잡아당기는 중...';
     if (reelBattle.status) {
-      reelBattle.status.textContent = '줄을 잡아당기는 중...';
+      reelBattle.status.textContent = baseStatus;
       reelBattle.status.classList.remove('success', 'fail');
     }
     if (reelBattle.info) {
-      const name = fish.spec?.displayName || '알 수 없는 물고기';
-      reelBattle.info.textContent = `${name}이(가) 버티고 있습니다.`;
+      if (fish.isTreasure) {
+        reelBattle.info.textContent = '무언가 묵직한 것이 걸렸어요!';
+      } else {
+        const name = fish.spec?.displayName || '알 수 없는 물고기';
+        reelBattle.info.textContent = `${name}이(가) 버티고 있습니다.`;
+      }
     }
     renderBattleFishArt(fish);
     if (reelBattle.white) {
@@ -752,7 +850,20 @@
       success: candidate.success,
       resolved: false,
       failTriggered: false,
-      failDirection: Math.random() > 0.5 ? 1 : -1
+      failDirection: Math.random() > 0.5 ? 1 : -1,
+      statusBase,
+      statusTimer: 0,
+      tensionTimer: fish.isTreasure ? window.rand(0.7, 1.2) : window.rand(0.45, 0.9),
+      tensionDuration: 0,
+      tensionElapsed: 0,
+      tensionStrength: fish.isTreasure ? 0.4 : 0.7,
+      tensionDirection: Math.random() > 0.5 ? 1 : -1,
+      tensionOffset: 0,
+      whitePulse: 0,
+      playerSurgeDelay: 0,
+      playerSurgeTimer: 0,
+      playerSurgeDuration: 0,
+      playerSurgeStrength: 0
     };
   }
 
@@ -766,37 +877,76 @@
     const fish = candidate.fish;
     const name = fish.spec?.displayName || 'Mystery Fish';
     const rarity = fish.spec?.rarity || 'Unknown';
-    fish.finished = true;
+    const isTreasure = !!fish.isTreasure || candidate.type === 'treasure';
+    if (!isTreasure) fish.finished = true;
     if (reelBattle.status) {
-      reelBattle.status.textContent = success ? '성공' : '실패';
+      const statusText = success ? (isTreasure ? '보물 발견!' : '성공') : '실패';
+      reelBattle.status.textContent = statusText;
       reelBattle.status.classList.toggle('success', success);
       reelBattle.status.classList.toggle('fail', !success);
     }
     let infoHtml = '';
     if (success) {
       if (reelBattle.fishImage) reelBattle.fishImage.classList.add('celebrate');
-      const points = computePoints(fish, window.world.castDistance);
-      candidate.points = points;
-      reelBattle.totalPoints += points;
-      window.world.pendingPointTotal = reelBattle.totalPoints;
-      reelBattle.results.push({ fish, success: true, points });
-      if (!window.world.catches.includes(fish)) {
-        window.world.catches.push(fish);
+      if (isTreasure) {
+        const reward = candidate.treasure || {
+          type: fish.rewardType || 'points',
+          amount: fish.rewardAmount || 0
+        };
+        if (reward.type === 'points') {
+          const points = Math.max(0, Math.round(reward.amount));
+          candidate.points = points;
+          reelBattle.totalPoints += points;
+          window.world.pendingPointTotal = reelBattle.totalPoints;
+          reelBattle.results.push({ type: 'treasure', fish, success: true, treasure: reward, points });
+          infoHtml = `
+            <p><strong>보물 상자</strong></p>
+            <p>빛나는 보석이 가득합니다.</p>
+            <p><strong>Points +${points}</strong></p>
+          `;
+        } else {
+          const gain = Math.max(1, Math.round(reward.amount));
+          candidate.points = 0;
+          reelBattle.bonusEnergy += gain;
+          reelBattle.results.push({ type: 'treasure', fish, success: true, treasure: reward, points: 0 });
+          infoHtml = `
+            <p><strong>보물 상자</strong></p>
+            <p>에너지 포션을 발견했습니다.</p>
+            <p><strong>Energy +${gain}</strong></p>
+          `;
+        }
+      } else {
+        const points = computePoints(fish, window.world.castDistance);
+        candidate.points = points;
+        reelBattle.totalPoints += points;
+        window.world.pendingPointTotal = reelBattle.totalPoints;
+        reelBattle.results.push({ fish, success: true, points });
+        if (!window.world.catches.includes(fish)) {
+          window.world.catches.push(fish);
+        }
+        infoHtml = `
+          <p><strong>${escapeHtml(name)}</strong> (${escapeHtml(rarity)})</p>
+          <p>Size: ${fish.size_cm.toFixed(1)} cm · Weight: ${fish.weight_kg.toFixed(2)} kg</p>
+          <p><strong>Points +${points}</strong></p>
+        `;
       }
-      infoHtml = `
-        <p><strong>${escapeHtml(name)}</strong> (${escapeHtml(rarity)})</p>
-        <p>Size: ${fish.size_cm.toFixed(1)} cm · Weight: ${fish.weight_kg.toFixed(2)} kg</p>
-        <p><strong>Points +${points}</strong></p>
-      `;
     } else {
       candidate.points = 0;
-      reelBattle.results.push({ fish, success: false, points: 0 });
-      infoHtml = `
-        <p><strong>${escapeHtml(name)}</strong> (${escapeHtml(rarity)})</p>
-        <p>Size: ${fish.size_cm.toFixed(1)} cm · Weight: ${fish.weight_kg.toFixed(2)} kg</p>
-        <p><strong>Points +0</strong></p>
-        <p style="margin-top:6px;">도망가 버렸어요!</p>
-      `;
+      if (isTreasure) {
+        infoHtml = `
+          <p><strong>보물 상자</strong></p>
+          <p>줄에서 빠져버렸어요...</p>
+        `;
+        reelBattle.results.push({ type: 'treasure', fish, success: false, treasure: candidate.treasure || null, points: 0 });
+      } else {
+        reelBattle.results.push({ fish, success: false, points: 0 });
+        infoHtml = `
+          <p><strong>${escapeHtml(name)}</strong> (${escapeHtml(rarity)})</p>
+          <p>Size: ${fish.size_cm.toFixed(1)} cm · Weight: ${fish.weight_kg.toFixed(2)} kg</p>
+          <p><strong>Points +0</strong></p>
+          <p style="margin-top:6px;">도망가 버렸어요!</p>
+        `;
+      }
     }
     if (reelBattle.info) {
       reelBattle.info.innerHTML = infoHtml;
@@ -806,10 +956,13 @@
       reelBattle.nextBtn.classList.remove('disabled');
     }
     const hasMore = reelBattle.index < reelBattle.queue.length - 1;
+    if (reelBattle.nextBtn) {
+      reelBattle.nextBtn.textContent = hasMore ? 'Next' : 'Summary';
+    }
     if (hasMore) {
-      startNextBattleCountdown();
+      startNextBattleCountdown('next');
     } else {
-      clearNextBattleCountdown();
+      startNextBattleCountdown('summary');
     }
   }
 
@@ -819,7 +972,7 @@
       reelBattle.summaryCountdownTimer = Math.max(0, reelBattle.summaryCountdownTimer - dt);
       if (reelBattle.summaryCountdownLabel) {
         const seconds = Math.max(0, reelBattle.summaryCountdownTimer);
-        reelBattle.summaryCountdownLabel.textContent = `${seconds.toFixed(1)}s`;
+        reelBattle.summaryCountdownLabel.textContent = `Close ${seconds.toFixed(1)}s`;
       }
       if (reelBattle.summaryCountdownTimer <= 0 && summaryVisible) {
         reelBattle.summaryCountdownActive = false;
@@ -830,11 +983,22 @@
 
     const state = reelBattle.state;
     if (!state || !reelBattle.modal || summaryVisible) return;
+    if (!state.resolved && state.statusTimer > 0) {
+      state.statusTimer = Math.max(0, state.statusTimer - dt);
+      if (state.statusTimer <= 0 && reelBattle.status) {
+        reelBattle.status.textContent = state.statusBase;
+      }
+    }
+    const candidate = state.candidate || null;
+    const fish = candidate?.fish || null;
+    const isTreasure = !!fish?.isTreasure;
     const previousPos = state.fishPos;
     state.elapsed = Math.min(state.elapsed + dt, state.duration + 0.6);
     const t = window.clamp(state.elapsed / state.duration, 0, 1);
     const eased = t * t * (3 - 2 * t);
-    const currentWidth = window.lerp(1, state.finalWhite, eased);
+    state.whitePulse = Math.max(0, (state.whitePulse || 0) - dt * 0.85);
+    const baseWidth = window.lerp(1, state.finalWhite, eased);
+    const currentWidth = window.clamp(baseWidth + (state.whitePulse || 0), state.finalWhite, 1);
     state.currentWidth = currentWidth;
     const whiteLeft = 0.5 - currentWidth / 2;
     if (reelBattle.white) {
@@ -843,20 +1007,84 @@
     }
     state.fishPhase += dt * state.fishSpeed;
     const safeAmplitude = Math.max(0.02, currentWidth / 2 - state.redWidth / 2 - 0.01);
-    if (state.success) {
-      const amp = Math.max(0.02, safeAmplitude);
-      state.fishPos = 0.5 + Math.sin(state.fishPhase) * amp;
-      state.fishPos = window.clamp(state.fishPos, whiteLeft + 0.02, whiteLeft + currentWidth - 0.02);
-    } else {
+    if (!state.resolved) {
+      if (!Number.isFinite(state.tensionOffset)) state.tensionOffset = 0;
+      if (state.tensionDuration > 0) {
+        state.tensionElapsed += dt;
+        const progress = Math.min(1, state.tensionElapsed / state.tensionDuration);
+        const swing = Math.sin(progress * Math.PI);
+        const bias = state.success ? 0.8 : 1.15;
+        state.tensionOffset = state.tensionDirection * state.tensionStrength * swing * bias;
+        if (state.tensionElapsed >= state.tensionDuration) {
+          state.tensionDuration = 0;
+          state.tensionElapsed = 0;
+          state.tensionTimer = isTreasure ? window.rand(0.9, 1.4) : window.rand(0.45, 0.85);
+        }
+      } else {
+        state.tensionOffset *= Math.pow(0.2, dt);
+        state.tensionTimer -= dt;
+        if (state.tensionTimer <= 0) {
+          state.tensionDuration = isTreasure ? window.rand(0.5, 0.9) : window.rand(0.35, 0.75);
+          state.tensionElapsed = 0;
+          const outward = Math.sign((state.fishPos ?? 0.5) - 0.5) || (Math.random() > 0.5 ? 1 : -1);
+          const baseDir = Math.random() < 0.5 ? -1 : 1;
+          state.tensionDirection = Math.random() < 0.55 ? baseDir : outward;
+          state.tensionStrength = isTreasure ? window.rand(0.2, 0.45) : window.rand(0.45, 0.8);
+          const pool = isTreasure ? TREASURE_MESSAGES : FISH_TUG_MESSAGES;
+          setBattleStatusMessage(state, pickMessage(pool), 0.9);
+          if (state.success) {
+            state.playerSurgeDelay = window.rand(0.15, 0.3);
+            state.playerSurgeDuration = window.rand(0.35, 0.55);
+            state.playerSurgeStrength = window.rand(1.1, 1.8);
+          } else if (Math.random() < 0.45) {
+            state.playerSurgeDelay = window.rand(0.25, 0.45);
+            state.playerSurgeDuration = window.rand(0.25, 0.4);
+            state.playerSurgeStrength = window.rand(0.6, 1.0);
+          }
+        }
+      }
+
+      if (state.playerSurgeDelay > 0) {
+        state.playerSurgeDelay -= dt;
+        if (state.playerSurgeDelay <= 0 && state.playerSurgeDuration > 0) {
+          setBattleStatusMessage(state, pickMessage(PLAYER_TUG_MESSAGES), 0.8);
+          state.playerSurgeTimer = state.playerSurgeDuration;
+        }
+      } else if (state.playerSurgeTimer > 0) {
+        state.playerSurgeTimer = Math.max(0, state.playerSurgeTimer - dt);
+      }
+    }
+
+    const amplitude = state.success ? Math.max(0.02, safeAmplitude) : Math.max(0.02, safeAmplitude * 0.9);
+    let desired = 0.5 + Math.sin(state.fishPhase) * amplitude;
+    desired += state.tensionOffset || 0;
+    state.fishPos += (desired - state.fishPos) * (1 - Math.pow(0.001, dt * 16));
+
+    if (state.playerSurgeTimer > 0 && state.playerSurgeDuration > 0) {
+      const progress = 1 - state.playerSurgeTimer / Math.max(state.playerSurgeDuration, 0.0001);
+      const curve = Math.sin(Math.min(1, progress) * Math.PI);
+      const pullStrength = state.playerSurgeStrength * curve * (state.success ? 1.25 : 0.7);
+      const pull = (0.5 - state.fishPos) * pullStrength * dt * 1.6;
+      state.fishPos += pull;
+      state.whitePulse = Math.max(state.whitePulse || 0, Math.abs(pullStrength) * 0.05);
+    }
+
+    if (!state.success) {
       if (!state.failTriggered && state.elapsed > state.duration * 0.45) {
         state.failTriggered = true;
+        if (!state.failDirection) {
+          state.failDirection = Math.sign(state.tensionOffset || (Math.random() - 0.5)) || 1;
+        }
       }
       if (state.failTriggered) {
         state.fishPos += state.failDirection * dt * 0.55;
-      } else {
-        const amp = Math.max(0.02, safeAmplitude * 0.8);
-        state.fishPos = 0.5 + Math.sin(state.fishPhase) * amp;
       }
+    }
+
+    if (state.success) {
+      state.fishPos = window.clamp(state.fishPos, whiteLeft + 0.02, whiteLeft + currentWidth - 0.02);
+    } else {
+      state.fishPos = window.clamp(state.fishPos, 0, 1);
     }
     const delta = state.fishPos - previousPos;
     if (Math.abs(delta) > 0.0005) {
@@ -870,9 +1098,17 @@
     if (reelBattle.fishImage && trackWidth) {
       const offset = (state.fishPos - 0.5) * trackWidth;
       reelBattle.fishImage.style.transform = `translate(-50%, -50%) translateX(${offset}px)`;
-      reelBattle.fishImage.classList.toggle('flip', facingRight);
+      if (isTreasure) {
+        reelBattle.fishImage.classList.remove('flip');
+      } else {
+        reelBattle.fishImage.classList.toggle('flip', facingRight);
+      }
     } else if (reelBattle.fishImage) {
-      reelBattle.fishImage.classList.toggle('flip', facingRight);
+      if (isTreasure) {
+        reelBattle.fishImage.classList.remove('flip');
+      } else {
+        reelBattle.fishImage.classList.toggle('flip', facingRight);
+      }
     }
     const whiteRight = whiteLeft + currentWidth;
     const redLeft = 0.5 - state.redWidth / 2;
@@ -894,7 +1130,8 @@
       reelBattle.autoAdvanceTimer = Math.max(0, reelBattle.autoAdvanceTimer - dt);
       if (reelBattle.nextCountdownLabel) {
         const seconds = Math.max(0, reelBattle.autoAdvanceTimer);
-        reelBattle.nextCountdownLabel.textContent = `${seconds.toFixed(1)}s`;
+        const prefix = reelBattle.autoAdvanceMode === 'summary' ? 'Summary' : 'Next';
+        reelBattle.nextCountdownLabel.textContent = `${prefix} ${seconds.toFixed(1)}s`;
       }
       if (reelBattle.autoAdvanceTimer <= 0) {
         clearNextBattleCountdown();
@@ -925,6 +1162,16 @@
       } else {
         list.innerHTML = reelBattle.results
           .map((result, index) => {
+            if (result.type === 'treasure') {
+              const reward = result.treasure || { type: 'points', amount: result.points };
+              const status = result.success ? '발견' : '실패';
+              const tail = result.success
+                ? reward.type === 'points'
+                  ? `+${Math.max(0, Math.round(reward.amount))}`
+                  : `Energy +${Math.max(1, Math.round(reward.amount || 1))}`
+                : '+0';
+              return `<p><span>${index + 1}. 보물 상자 – ${status}</span><span>${tail}</span></p>`;
+            }
             const fish = result.fish;
             const name = escapeHtml(fish.spec?.displayName || `Catch ${index + 1}`);
             const rarity = escapeHtml(fish.spec?.rarity || 'Unknown');
@@ -934,6 +1181,9 @@
             return `<p><span>${index + 1}. ${name} (${rarity}) – ${status}</span><span>${label}</span></p>`;
           })
           .join('');
+        if (reelBattle.bonusEnergy > 0) {
+          list.innerHTML += `<p class="summary-energy">추가 보상 – Energy +${reelBattle.bonusEnergy}</p>`;
+        }
       }
     }
     if (reelBattle.summaryTotal) {
@@ -946,11 +1196,17 @@
   function closeCatchSummary() {
     clearSummaryCountdown();
     const total = reelBattle.totalPoints;
+    const bonusEnergy = reelBattle.bonusEnergy;
     setModalVisibility(reelBattle.summaryModal, false);
     if (total > 0) {
       window.addPointsWithSparkle(total);
-    } else {
+    } else if (bonusEnergy === 0) {
       window.setHUD();
+    }
+    if (bonusEnergy > 0) {
+      window.settings.energy += bonusEnergy;
+      window.setHUD();
+      window.toast(`Energy +${bonusEnergy}`);
     }
     resetReelBattle();
     preparePlayRound(true);
@@ -1006,6 +1262,7 @@
     window.world.autoCastTimer = 0;
     window.world.autoHoldActive = false;
     window.world.autoReleaseDelay = 0;
+    window.world.autoArmed = false;
     if (window.waveEffect) {
       window.waveEffect.playing = false;
       window.waveEffect.frameIndex = 0;
@@ -1784,11 +2041,15 @@
               window.toast('Not enough energy.');
               return;
             }
+            setAutoMode(true, false);
             startPlaySession();
+          } else {
+            setAutoMode(true, false);
+            window.toast('Auto 모드가 다음 라운드부터 적용됩니다.');
           }
-          setAutoMode(true);
         } else {
-          setAutoMode(false);
+          setAutoMode(false, false);
+          window.toast('Auto 모드를 종료했습니다.');
         }
       });
     }
