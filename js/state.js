@@ -154,7 +154,10 @@ window.world = {
   sinkDuration: 0,
   sinkStartDist: 0,
   sinkEndDist: 0,
-  pendingCatchSims: []
+  battleQueue: [],
+  battleResults: [],
+  currentBattleIndex: -1,
+  pendingPointTotal: 0
 };
 
 window.camera = { y: 0 };
