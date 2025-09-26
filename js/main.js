@@ -91,7 +91,6 @@
     reelBattle.summaryClose = document.getElementById('summaryClose');
     reelBattle.nextCountdownLabel = document.getElementById('battleNextCountdown');
     reelBattle.summaryCountdownLabel = document.getElementById('summaryCountdown');
-
     updateAutoButtonUI();
 
     if (!window.canvas || !window.ctx || !window.startBtn || !window.mainMenu) {
