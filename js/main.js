@@ -851,7 +851,7 @@
       resolved: false,
       failTriggered: false,
       failDirection: Math.random() > 0.5 ? 1 : -1,
-      statusBase,
+      statusBase: baseStatus,
       statusTimer: 0,
       tensionTimer: fish.isTreasure ? window.rand(0.7, 1.2) : window.rand(0.45, 0.9),
       tensionDuration: 0,
