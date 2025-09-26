@@ -482,7 +482,7 @@
     const fishes = window.world.fishes;
     const scatterDuration = window.FISH_SCATTER_DURATION ?? 1;
     const alertDuration = window.FISH_ALERT_DURATION ?? 1;
-    const minRadius = window.FISH_SCATTER_MIN_RADIUS ?? 4;
+    const scareRadius = window.BOBBER_SCARE_RADIUS ?? window.FISH_SCATTER_MIN_RADIUS ?? 1.5;
     const force = window.FISH_SCATTER_FORCE ?? 14;
 
     for (const fish of fishes) {
@@ -491,9 +491,7 @@
       const dx = position.x;
       const dy = (position.y ?? fish.distance ?? distance) - distance;
       const dist = Math.sqrt(dx * dx + dy * dy);
-      const sizeCm = fish.size_cm ?? fish.spec?.size_cm?.max ?? 40;
-      const radius = Math.max(minRadius, sizeCm / 10);
-      if (!Number.isFinite(dist) || dist > radius) continue;
+      if (!Number.isFinite(dist) || dist > scareRadius) continue;
 
       let dirX = dx;
       let dirY = dy;

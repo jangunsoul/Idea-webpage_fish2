@@ -70,7 +70,8 @@ function spawnFishes(dist, options = {}) {
 
   if (spread) {
     for (let base = minDistance; base <= maxDistance; base += segmentSize) {
-      const count = randi(2, 3);
+      const countBase = randi(2, 3);
+      const count = Math.max(1, Math.round(countBase * 0.7));
       for (let i = 0; i < count; i++) {
         const offset = rand(-segmentSize * 0.45, segmentSize * 0.45);
         const distance = clamp(base + offset, minDistance, maxDistance);
@@ -79,7 +80,8 @@ function spawnFishes(dist, options = {}) {
     }
   } else {
     const density = randi(7, 11);
-    for (let i = 0; i < density; i++) {
+    const reduced = Math.max(1, Math.round(density * 0.7));
+    for (let i = 0; i < reduced; i++) {
       const distance = clamp(rand(minDistance, maxDistance), minDistance, maxDistance);
       spawnAtDistance(distance);
     }
