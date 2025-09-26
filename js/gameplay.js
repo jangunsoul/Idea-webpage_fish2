@@ -34,6 +34,9 @@ function spawnFishes(dist, options = {}) {
     const weight = rand(spec.weight_kg.min, spec.weight_kg.max);
     const lateral = sampleLateral();
     const cachedImage = fishMap?.get?.(spec.id);
+    const baseRange = window.FISH_VERTICAL_HOME_RANGE ?? 32;
+    const variance = rand(-baseRange * 0.25, baseRange * 0.25);
+    const verticalRange = clamp(baseRange + variance, baseRange * 0.6, baseRange * 1.4);
 
     const fish = {
       specId: spec.id,
@@ -57,7 +60,9 @@ function spawnFishes(dist, options = {}) {
       personalityFactor: rand(0.8, 1.2),
       moveBias: getFishMoveBias(spec),
       facingRight: Math.random() > 0.5,
-      swimSpeed: getFishSwimSpeed(spec, weight)
+      swimSpeed: getFishSwimSpeed(spec, weight),
+      homeY: distance,
+      verticalRange
     };
 
     fishes.push(fish);
