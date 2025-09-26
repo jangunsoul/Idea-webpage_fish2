@@ -135,12 +135,15 @@ function drawCharacterPlatform(charBaseX, charWidth, footY, metrics) {
   const dock = environmentState.dock;
   if (!dock) return;
   const tileH = Math.max(1, metrics.tileH);
-  const scale = (tileH * 1.05) / Math.max(1, dock.height);
+  const baseScale = (tileH * 1.05) / Math.max(1, dock.height);
+  const baseDestH = dock.height * baseScale;
+  const topY = footY - baseDestH + tileH * 0.12;
+  const scale = baseScale * 3;
   const destH = dock.height * scale;
   const destW = dock.width * scale;
   const centerX = charBaseX + charWidth * 0.5;
   const destX = centerX - destW * 0.5;
-  const destY = footY - destH + tileH * 0.12;
+  const destY = topY;
   ctx.save();
   ctx.globalAlpha = 0.92;
   ctx.drawImage(dock, destX, destY, destW, destH);
@@ -207,11 +210,16 @@ function drawBobber(x, y) {
 function drawBobberWaveEffect(W, metrics, lateralScale) {
   const effect = waveEffect;
   if (!effect || !effect.playing || !effect.image) return;
-  const frameW = effect.frameWidth || Math.floor(effect.image.width / Math.max(1, effect.frameCount));
-  const frameH = effect.frameHeight || effect.image.height;
+  const cols = Math.max(1, Math.floor(effect.sheetColumns || 1));
+  const rows = Math.max(1, Math.floor(effect.sheetRows || Math.ceil(effect.frameCount / cols)));
+  const frameW = effect.frameWidth || Math.floor(effect.image.width / cols);
+  const frameH = effect.frameHeight || Math.floor(effect.image.height / rows);
   if (!frameW || !frameH) return;
   const frameIndex = Math.max(0, Math.min(effect.frameCount - 1, Math.floor(effect.frameIndex)));
-  const sx = frameIndex * frameW;
+  const col = frameIndex % cols;
+  const row = Math.floor(frameIndex / cols);
+  const sx = col * frameW;
+  const sy = row * frameH;
   const distancePx = effect.distance * metrics.pxPerMeter;
   const worldY = metrics.waterSurfaceY - distancePx;
   const screenY = worldY + camera.y;
@@ -222,7 +230,7 @@ function drawBobberWaveEffect(W, metrics, lateralScale) {
   const destH = frameH * scale;
   ctx.save();
   ctx.globalAlpha = 0.85;
-  ctx.drawImage(effect.image, sx, 0, frameW, frameH, screenX - destW / 2, screenY - destH / 2, destW, destH);
+  ctx.drawImage(effect.image, sx, sy, frameW, frameH, screenX - destW / 2, screenY - destH / 2, destW, destH);
   ctx.restore();
 }
 

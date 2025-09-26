@@ -61,6 +61,7 @@ window.FISH_VERTICAL_ESCAPE_MULT = 1.9;
 window.FISH_SCATTER_MIN_RADIUS = 4;
 window.FISH_SCATTER_FORCE = 14;
 window.FISH_SCATTER_DURATION = 1.6;
+window.FISH_ALERT_DURATION = 2.0;
 window.MINIMAP_SEGMENTS = 48;
 window.MINIMAP_SEGMENT_METERS = 5;
 
@@ -192,6 +193,8 @@ window.waveEffect = {
   timer: 0,
   playing: false,
   distance: 0,
-  lateral: 0
+  lateral: 0,
+  sheetColumns: 3,
+  sheetRows: 2
 };
 

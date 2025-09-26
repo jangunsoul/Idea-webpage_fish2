@@ -187,9 +187,11 @@
     }
     queue('assets/characters/waterwave.png', img => {
       window.waveEffect.image = img;
-      if (img && img.width) {
-        window.waveEffect.frameWidth = Math.floor(img.width / Math.max(1, window.waveEffect.frameCount));
-        window.waveEffect.frameHeight = img.height;
+      if (img && img.width && img.height) {
+        const cols = Math.max(1, Math.floor(window.waveEffect.sheetColumns || 1));
+        const rows = Math.max(1, Math.floor(window.waveEffect.sheetRows || Math.ceil(window.waveEffect.frameCount / cols)));
+        window.waveEffect.frameWidth = Math.floor(img.width / cols);
+        window.waveEffect.frameHeight = Math.floor(img.height / rows);
       }
     });
 
@@ -364,6 +366,9 @@
         if (!Number.isFinite(fish.verticalRange)) {
           fish.verticalRange = window.FISH_VERTICAL_HOME_RANGE ?? 32;
         }
+        fish.alertTimer = 0;
+        fish.alertVector = null;
+        fish.wanderTimer = window.rand(0.6, 1.4);
       }
     }
     resetTargetCircle();
@@ -476,6 +481,7 @@
     if (!Array.isArray(window.world.fishes) || !window.world.fishes.length) return;
     const fishes = window.world.fishes;
     const scatterDuration = window.FISH_SCATTER_DURATION ?? 1.6;
+    const alertDuration = window.FISH_ALERT_DURATION ?? 2;
     const minRadius = window.FISH_SCATTER_MIN_RADIUS ?? 4;
     const force = window.FISH_SCATTER_FORCE ?? 14;
 
@@ -489,27 +495,31 @@
       const radius = Math.max(minRadius, sizeCm / 10);
       if (!Number.isFinite(dist) || dist > radius) continue;
 
-      const angle = Number.isFinite(dx) && Number.isFinite(dy) ? Math.atan2(dy, dx) : Math.random() * Math.PI * 2;
-      const pushDistance = radius * 1.1;
-      const dirX = Math.cos(angle);
-      const dirY = Math.sin(angle);
-      const safeDirX = Number.isFinite(dirX) ? dirX : 1;
-      const safeDirY = Number.isFinite(dirY) ? dirY : 0;
+      let dirX = dx;
+      let dirY = dy;
+      if (!Number.isFinite(dirX) || !Number.isFinite(dirY) || Math.abs(dirX) + Math.abs(dirY) < 0.001) {
+        const angle = Math.random() * Math.PI * 2;
+        dirX = Math.cos(angle);
+        dirY = Math.sin(angle);
+      }
+      const length = Math.hypot(dirX, dirY) || 1;
+      const safeDirX = dirX / length;
+      const safeDirY = dirY / length;
 
       if (!fish.position) fish.position = { x: 0, y: fish.distance ?? distance };
       if (!fish.velocity) fish.velocity = { x: 0, y: 0 };
       if (!fish.targetVelocity) fish.targetVelocity = { x: 0, y: 0 };
 
-      fish.position.x = safeDirX * pushDistance;
-      fish.position.y = distance + safeDirY * pushDistance;
-      const lateralLimit = Math.max(1, window.world?.lateralLimit ?? 5);
-      fish.position.x = clamp(fish.position.x, -lateralLimit, lateralLimit);
-      fish.targetVelocity.x = safeDirX * force;
-      fish.targetVelocity.y = safeDirY * force * 0.7;
+      const speed = Math.max(force, (fish.swimSpeed || 6) * 1.4);
+      fish.targetVelocity.x = safeDirX * speed;
+      fish.targetVelocity.y = safeDirY * speed * 0.7;
       fish.velocity.x = fish.targetVelocity.x;
       fish.velocity.y = fish.targetVelocity.y;
       fish.moving = true;
       fish.escapeTimer = Math.max(fish.escapeTimer ?? 0, scatterDuration);
+      fish.alertTimer = alertDuration;
+      fish.alertVector = { x: safeDirX, y: safeDirY };
+      if (typeof fish.wanderTimer === 'number') fish.wanderTimer = Math.min(fish.wanderTimer, 0.1);
       fish.stressLevel = Math.min(1, (fish.stressLevel ?? 0) + 0.4);
     }
   }
@@ -975,10 +985,12 @@
           continue;
         }
         const fishImage = window.gameData.resources.fish.get(fish.specId);
+        let drawnHeight = 18;
         if (fishImage) {
           const fishScale = 0.75;
           const fishW = fishImage.width * fishScale;
           const fishH = fishImage.height * fishScale;
+          drawnHeight = fishH;
           const facingRight = !!fish.facingRight;
           if (facingRight) {
             window.ctx.save();
@@ -991,6 +1003,7 @@
           }
         } else {
           const fishSize = 10;
+          drawnHeight = fishSize * 1.2;
           window.ctx.fillStyle = fish.iconColor;
           window.ctx.beginPath();
           window.ctx.ellipse(fishScreenX, fishScreenY, fishSize, fishSize * 0.6, 0, 0, Math.PI * 2);
@@ -1008,6 +1021,36 @@
           window.ctx.arc(fishScreenX, fishScreenY, 14, 0, Math.PI * 2);
           window.ctx.stroke();
           window.ctx.setLineDash([]);
+        }
+        if (fish.alertTimer > 0) {
+          const alertDuration = window.FISH_ALERT_DURATION ?? 2;
+          const progress = window.clamp(fish.alertTimer / Math.max(0.001, alertDuration), 0, 1);
+          const bounce = Math.sin((1 - progress) * Math.PI * 2) * 4;
+          const bubbleRadius = 12;
+          const bubbleX = fishScreenX;
+          const bubbleY = fishScreenY - drawnHeight / 2 - bubbleRadius - 6 + bounce;
+          window.ctx.save();
+          window.ctx.globalAlpha = 0.92;
+          window.ctx.fillStyle = '#ffffff';
+          window.ctx.beginPath();
+          window.ctx.arc(bubbleX, bubbleY, bubbleRadius, 0, Math.PI * 2);
+          window.ctx.fill();
+          window.ctx.strokeStyle = '#ef4444';
+          window.ctx.lineWidth = 2;
+          window.ctx.stroke();
+          window.ctx.beginPath();
+          window.ctx.moveTo(bubbleX - 4, bubbleY + bubbleRadius - 2);
+          window.ctx.lineTo(bubbleX, bubbleY + bubbleRadius + 6);
+          window.ctx.lineTo(bubbleX + 4, bubbleY + bubbleRadius - 2);
+          window.ctx.closePath();
+          window.ctx.fill();
+          window.ctx.stroke();
+          window.ctx.fillStyle = '#ef4444';
+          window.ctx.font = 'bold 14px sans-serif';
+          window.ctx.textAlign = 'center';
+          window.ctx.textBaseline = 'middle';
+          window.ctx.fillText('!', bubbleX, bubbleY + 1);
+          window.ctx.restore();
         }
       }
 
