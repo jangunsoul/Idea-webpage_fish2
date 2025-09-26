@@ -34,6 +34,9 @@ function spawnFishes(dist, options = {}) {
     const weight = rand(spec.weight_kg.min, spec.weight_kg.max);
     const lateral = sampleLateral();
     const cachedImage = fishMap?.get?.(spec.id);
+    const baseRange = window.FISH_VERTICAL_HOME_RANGE ?? 32;
+    const variance = rand(-baseRange * 0.25, baseRange * 0.25);
+    const verticalRange = clamp(baseRange + variance, baseRange * 0.6, baseRange * 1.4);
 
     const fish = {
       specId: spec.id,
@@ -57,7 +60,9 @@ function spawnFishes(dist, options = {}) {
       personalityFactor: rand(0.8, 1.2),
       moveBias: getFishMoveBias(spec),
       facingRight: Math.random() > 0.5,
-      swimSpeed: getFishSwimSpeed(spec, weight)
+      swimSpeed: getFishSwimSpeed(spec, weight),
+      homeY: distance,
+      verticalRange
     };
 
     fishes.push(fish);
@@ -65,7 +70,8 @@ function spawnFishes(dist, options = {}) {
 
   if (spread) {
     for (let base = minDistance; base <= maxDistance; base += segmentSize) {
-      const count = randi(3, 4);
+      const countBase = randi(2, 3);
+      const count = Math.max(1, Math.round(countBase * 0.7));
       for (let i = 0; i < count; i++) {
         const offset = rand(-segmentSize * 0.45, segmentSize * 0.45);
         const distance = clamp(base + offset, minDistance, maxDistance);
@@ -73,8 +79,9 @@ function spawnFishes(dist, options = {}) {
       }
     }
   } else {
-    const density = randi(12, 18);
-    for (let i = 0; i < density; i++) {
+    const density = randi(7, 11);
+    const reduced = Math.max(1, Math.round(density * 0.7));
+    for (let i = 0; i < reduced; i++) {
       const distance = clamp(rand(minDistance, maxDistance), minDistance, maxDistance);
       spawnAtDistance(distance);
     }

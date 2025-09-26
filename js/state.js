@@ -49,13 +49,20 @@ window.FISH_SWIM_SPEED_TABLE = {
 
 window.DETECTION_RANGE_M = 5;
 window.FISH_SCHOOLING_RADIUS = 18;
-window.FISH_AVOIDANCE_RADIUS = 12;
+window.FISH_AVOIDANCE_RADIUS = 1.5;
 window.FISH_AVOIDANCE_FORCE = 6;
 window.FISH_SEPARATION_FORCE = 0.9;
 window.FISH_COHESION_FORCE = 0.65;
 window.FISH_ALIGNMENT_FORCE = 0.45;
 window.FISH_WANDER_FORCE = 0.55;
 window.FISH_CENTERING_FORCE = 0.35;
+window.FISH_VERTICAL_HOME_RANGE = 32;
+window.FISH_VERTICAL_ESCAPE_MULT = 1.9;
+window.FISH_SCATTER_MIN_RADIUS = 1.5;
+window.BOBBER_SCARE_RADIUS = 1.5;
+window.FISH_SCATTER_FORCE = 14;
+window.FISH_SCATTER_DURATION = 1.0;
+window.FISH_ALERT_DURATION = 1.0;
 window.MINIMAP_SEGMENTS = 48;
 window.MINIMAP_SEGMENT_METERS = 5;
 
@@ -151,7 +158,8 @@ window.environmentState = {
   sources: {},
   water: null,
   shore: null,
-  land: null
+  land: null,
+  dock: null
 };
 
 window.characterSprite = {
@@ -175,4 +183,19 @@ window.characterSprite = {
 
 window.globalTime = 0;
 window.latestMetrics = null;
+
+window.waveEffect = {
+  image: null,
+  frameWidth: 0,
+  frameHeight: 0,
+  frameCount: 6,
+  frameDuration: 0.08,
+  frameIndex: 0,
+  timer: 0,
+  playing: false,
+  distance: 0,
+  lateral: 0,
+  sheetColumns: 3,
+  sheetRows: 2
+};
 
