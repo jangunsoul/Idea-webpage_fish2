@@ -126,7 +126,7 @@ function updateCharacterAnimation(dt) {
     sprite.playing = false;
     const hold = sprite.holdFrame ?? sprite.postCastFrame;
     if (typeof hold === 'number') sprite.currentFrame = hold;
-  } else if (state === GameState.Idle || state === GameState.Casting) {
+  } else if (state === GameState.Idle || state === GameState.Targeting) {
     sprite.currentFrame = sprite.idleFrame || 0;
   }
 }
@@ -191,7 +191,7 @@ function updateCamera(distance, metrics, dt, state) {
   const distancePx = clamp(distance * metrics.pxPerMeter, 0, metrics.distancePxRange);
   const baseY = metrics.waterSurfaceY - distancePx;
   let desired = 0;
-  if (state === GameState.Flight || state === GameState.Fishing) {
+  if (state === GameState.Targeting) {
     desired = clamp(metrics.targetBobberY - baseY, 0, metrics.maxScroll);
   }
   const smoothing = 1 - Math.pow(0.001, dt * 9);

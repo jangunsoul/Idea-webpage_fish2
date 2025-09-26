@@ -120,13 +120,13 @@ function calculateWanderForce(fish, time) {
 function updateFishSimulation(dt) {
   if (!world.fishes || !world.fishes.length) return;
   
-  const bobberTarget = clamp(world.bobberDist, 30, 200);
+  const bobberTarget = clamp(world.bobberDist, window.MIN_SINK_DISTANCE ?? 30, 200);
   const velocitySmooth = 1 - Math.pow(0.001, dt * 9);
   const bobberPos = { x: 0, y: bobberTarget };
   
   for (const fish of world.fishes) {
     if (!fish || fish.finished) continue;
-    
+
     // 필수 속성 초기화
     if (!fish.position) fish.position = { x: 0, y: fish.distance ?? 30 };
     if (!fish.velocity) fish.velocity = { x: 0, y: 0 };
@@ -177,14 +177,19 @@ function updateFishSimulation(dt) {
       
       finalX += avoidanceForce.x * avoidanceWeight;
       finalY += avoidanceForce.y * avoidanceWeight;
-      
+
       finalX += wanderForce.x * FISH_WANDER_FORCE * wanderWeight;
       finalY += wanderForce.y * FISH_WANDER_FORCE * wanderWeight;
-      
+
+      const lateralSpan = Math.max(1, world.lateralLimit || 5);
+      const centerStrength = (window.FISH_CENTERING_FORCE ?? 0.35) * (fish.personalityFactor ?? 1);
+      const normalizedX = clamp(fish.position.x / lateralSpan, -1, 1);
+      finalX += -normalizedX * centerStrength * (1.2 + Math.abs(normalizedX) * 1.1);
+
       // 속도 정규화 및 적용
       const magnitude = Math.sqrt(finalX * finalX + finalY * finalY);
       if (magnitude > 0.1) {
-        const speed = (fish.swimSpeed || 8) * fish.personalityFactor * (0.8 + fish.stressLevel * 0.4);
+        const speed = (fish.swimSpeed || 8) * fish.personalityFactor * (0.6 + fish.stressLevel * 0.4);
         fish.targetVelocity.x = (finalX / magnitude) * speed;
         fish.targetVelocity.y = (finalY / magnitude) * speed * 0.7; // 수직 움직임 제한
         fish.moving = true;
@@ -201,19 +206,34 @@ function updateFishSimulation(dt) {
     // 속도 스무딩
     fish.velocity.x += (fish.targetVelocity.x - fish.velocity.x) * velocitySmooth;
     fish.velocity.y += (fish.targetVelocity.y - fish.velocity.y) * velocitySmooth;
-    
+
+    if (Math.abs(fish.velocity.x) > 0.05) {
+      fish.facingRight = fish.velocity.x > 0;
+    }
+
     // 위치 업데이트
     fish.position.x += fish.velocity.x * dt;
     fish.position.y += fish.velocity.y * dt;
     
     // 경계 처리
     let clamped = false;
+    let horizontalBounce = false;
     if (fish.position.y < 30) { fish.position.y = 30; clamped = true; }
     if (fish.position.y > 200) { fish.position.y = 200; clamped = true; }
-    if (fish.position.x < -52) { fish.position.x = -52; clamped = true; }
-    if (fish.position.x > 52) { fish.position.x = 52; clamped = true; }
-    
-    if (clamped) {
+    const lateralLimit = Math.max(1, world.lateralLimit || 5);
+    if (fish.position.x < -lateralLimit) { fish.position.x = -lateralLimit; clamped = true; horizontalBounce = true; }
+    if (fish.position.x > lateralLimit) { fish.position.x = lateralLimit; clamped = true; horizontalBounce = true; }
+
+    if (horizontalBounce) {
+      const direction = fish.position.x > 0 ? -1 : 1;
+      const desiredSpeed = Math.max(Math.abs(fish.targetVelocity.x), fish.swimSpeed || 6) * 0.9;
+      const speed = Math.max(3, desiredSpeed);
+      fish.targetVelocity.x = direction * speed;
+      fish.velocity.x = fish.targetVelocity.x;
+      fish.moving = true;
+    }
+
+    if (clamped && !horizontalBounce) {
       fish.targetVelocity.x *= -0.3;
       fish.targetVelocity.y *= -0.3;
     }

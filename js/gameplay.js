@@ -13,34 +13,71 @@ function sampleSpecies() {
 }
 
 // 물고기 스폰
-function spawnFishes(dist, metrics, viewportWidth) {
-  if (!SPECIES.length) return { fishes: [], lateralLimit: 26, displayRange: 26 };
-  
-  const ratio = clamp(dist / settings.maxCast, 0.2, 1);
-  const count = randi(4 + ratio * 2, 6 + ratio * 3);
+function spawnFishes(dist, options = {}) {
+  const halfWidth = options.halfWidth ?? 5;
+  if (!SPECIES.length) return { fishes: [], lateralLimit: halfWidth, displayRange: halfWidth };
+
+  const spread = !!options.spread;
   const fishes = [];
-  
-  for (let i = 0; i < count; i++) {
+  const minDistance = 30;
+  const maxDistance = spread ? 200 : Math.min(dist + 20, 200);
+  const segmentSize = Math.max(2, window.MINIMAP_SEGMENT_METERS || 5);
+  const fishMap = gameData?.resources?.fish;
+
+  const sampleLateral = () => rand(-halfWidth, halfWidth);
+
+  const spawnAtDistance = distance => {
     const spec = sampleSpecies();
-    if (!spec) continue;
-    
+    if (!spec) return;
+
     const size = rand(spec.size_cm.min, spec.size_cm.max);
     const weight = rand(spec.weight_kg.min, spec.weight_kg.max);
-    const distance = rand(30, Math.min(dist + 20, 200));
-    const lateral = rand(-26, 26);
-    
-    const fishMap = gameData?.resources?.fish;
+    const lateral = sampleLateral();
     const cachedImage = fishMap?.get?.(spec.id);
-    
+
     const fish = {
-      specId: spec.id, spec, distance, size_cm: size, weight_kg: weight, engaged: false, finished: false,
-      iconColor: spec.ui.mapColorHex, position: { x: lateral, y: distance },
-      velocity: { x: 0, y: 0 }, targetVelocity: { x: 0, y: 0 }, bonusMultiplier: 1,
-      escapeTimer: 0, lastCircleTime: -Infinity, renderCache: null, image: cachedImage || null, active: null,
-      stressLevel: 0, personalityFactor: rand(0.8, 1.2), moveBias: getFishMoveBias(spec),
+      specId: spec.id,
+      spec,
+      distance,
+      size_cm: size,
+      weight_kg: weight,
+      engaged: false,
+      finished: false,
+      iconColor: spec.ui.mapColorHex,
+      position: { x: lateral, y: distance },
+      velocity: { x: 0, y: 0 },
+      targetVelocity: { x: 0, y: 0 },
+      bonusMultiplier: 1,
+      escapeTimer: 0,
+      lastCircleTime: -Infinity,
+      renderCache: null,
+      image: cachedImage || null,
+      active: null,
+      stressLevel: 0,
+      personalityFactor: rand(0.8, 1.2),
+      moveBias: getFishMoveBias(spec),
+      facingRight: Math.random() > 0.5,
       swimSpeed: getFishSwimSpeed(spec, weight)
     };
+
     fishes.push(fish);
+  };
+
+  if (spread) {
+    for (let base = minDistance; base <= maxDistance; base += segmentSize) {
+      const count = randi(3, 4);
+      for (let i = 0; i < count; i++) {
+        const offset = rand(-segmentSize * 0.45, segmentSize * 0.45);
+        const distance = clamp(base + offset, minDistance, maxDistance);
+        spawnAtDistance(distance);
+      }
+    }
+  } else {
+    const density = randi(12, 18);
+    for (let i = 0; i < density; i++) {
+      const distance = clamp(rand(minDistance, maxDistance), minDistance, maxDistance);
+      spawnAtDistance(distance);
+    }
   }
   
   // 보너스 물고기 설정
@@ -53,9 +90,9 @@ function spawnFishes(dist, metrics, viewportWidth) {
       if (rare) rare.bonusMultiplier = 3;
     }
   }
-  
+
   fishes.sort((a, b) => a.distance - b.distance);
-  return { fishes, lateralLimit: 52, displayRange: 26 };
+  return { fishes, lateralLimit: halfWidth, displayRange: halfWidth };
 }
 
 // === 개선된 잡기 확률 시스템 ===
@@ -248,10 +285,10 @@ function updateActiveCircles(dt, bx, by, metrics, cameraY) {
 // 투영 컨텍스트 해결
 function resolveProjectionContext(metrics) {
   const pxPerMeter = metrics?.pxPerMeter || (canvas.clientHeight / Math.max(1, settings.maxCast));
-  const displayRange = 26;
+  const displayRange = Math.max(1, world.displayRange || world.lateralLimit || 5);
   const width = canvas.clientWidth;
   const centerX = width * 0.5;
-  const pxPerMeterX = (width * 0.45) / displayRange;
+  const pxPerMeterX = (width * 0.82) / (displayRange * 2);
   return { pxPerMeter, displayRange, pxPerMeterX, centerX, width };
 }
 
