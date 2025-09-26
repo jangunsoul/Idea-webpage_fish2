@@ -234,6 +234,116 @@ function drawBobberWaveEffect(W, metrics, lateralScale) {
   ctx.restore();
 }
 
+function drawBobberWaveEffect(W, metrics, lateralScale) {
+  const effect = waveEffect;
+  if (!effect || !effect.playing || !effect.image) return;
+  const cols = Math.max(1, Math.floor(effect.sheetColumns || 1));
+  const rows = Math.max(1, Math.floor(effect.sheetRows || Math.ceil(effect.frameCount / cols)));
+  const frameW = effect.frameWidth || Math.floor(effect.image.width / cols);
+  const frameH = effect.frameHeight || Math.floor(effect.image.height / rows);
+  if (!frameW || !frameH) return;
+  const frameIndex = Math.max(0, Math.min(effect.frameCount - 1, Math.floor(effect.frameIndex)));
+  const col = frameIndex % cols;
+  const row = Math.floor(frameIndex / cols);
+  const sx = col * frameW;
+  const sy = row * frameH;
+  const distancePx = effect.distance * metrics.pxPerMeter;
+  const worldY = metrics.waterSurfaceY - distancePx;
+  const screenY = worldY + camera.y;
+  const lateral = effect.lateral || 0;
+  const screenX = W * 0.5 + metrics.bobberOffsetX + lateral * lateralScale;
+  const baseScale = Math.min(1.45, Math.max(0.6, (metrics.tileW * 1.2) / Math.max(1, frameW)));
+  const scale = baseScale * 6;
+  const destW = frameW * scale;
+  const destH = frameH * scale;
+  ctx.save();
+  ctx.globalAlpha = 0.85;
+  ctx.drawImage(effect.image, sx, sy, frameW, frameH, screenX - destW / 2, screenY - destH / 2, destW, destH);
+  ctx.restore();
+}
+
+function drawBobberWaveEffect(W, metrics, lateralScale) {
+  const effect = waveEffect;
+  if (!effect || !effect.playing || !effect.image) return;
+  const cols = Math.max(1, Math.floor(effect.sheetColumns || 1));
+  const rows = Math.max(1, Math.floor(effect.sheetRows || Math.ceil(effect.frameCount / cols)));
+  const frameW = effect.frameWidth || Math.floor(effect.image.width / cols);
+  const frameH = effect.frameHeight || Math.floor(effect.image.height / rows);
+  if (!frameW || !frameH) return;
+  const frameIndex = Math.max(0, Math.min(effect.frameCount - 1, Math.floor(effect.frameIndex)));
+  const col = frameIndex % cols;
+  const row = Math.floor(frameIndex / cols);
+  const sx = col * frameW;
+  const sy = row * frameH;
+  const distancePx = effect.distance * metrics.pxPerMeter;
+  const worldY = metrics.waterSurfaceY - distancePx;
+  const screenY = worldY + camera.y;
+  const lateral = effect.lateral || 0;
+  const screenX = W * 0.5 + metrics.bobberOffsetX + lateral * lateralScale;
+  const baseScale = Math.min(1.45, Math.max(0.6, (metrics.tileW * 1.2) / Math.max(1, frameW)));
+  const scale = baseScale * 3;
+  const destW = frameW * scale;
+  const destH = frameH * scale;
+  ctx.save();
+  ctx.globalAlpha = 0.85;
+  ctx.drawImage(effect.image, sx, sy, frameW, frameH, screenX - destW / 2, screenY - destH / 2, destW, destH);
+  ctx.restore();
+}
+function drawBobberWaveEffect(W, metrics, lateralScale) {
+  const effect = waveEffect;
+  if (!effect || !effect.playing || !effect.image) return;
+  const cols = Math.max(1, Math.floor(effect.sheetColumns || 1));
+  const rows = Math.max(1, Math.floor(effect.sheetRows || Math.ceil(effect.frameCount / cols)));
+  const frameW = effect.frameWidth || Math.floor(effect.image.width / cols);
+  const frameH = effect.frameHeight || Math.floor(effect.image.height / rows);
+  if (!frameW || !frameH) return;
+  const frameIndex = Math.max(0, Math.min(effect.frameCount - 1, Math.floor(effect.frameIndex)));
+  const col = frameIndex % cols;
+  const row = Math.floor(frameIndex / cols);
+  const sx = col * frameW;
+  const sy = row * frameH;
+  const distancePx = effect.distance * metrics.pxPerMeter;
+  const worldY = metrics.waterSurfaceY - distancePx;
+  const screenY = worldY + camera.y;
+  const lateral = effect.lateral || 0;
+  const screenX = W * 0.5 + metrics.bobberOffsetX + lateral * lateralScale;
+  const baseScale = Math.min(1.45, Math.max(0.6, (metrics.tileW * 1.2) / Math.max(1, frameW)));
+  const scale = baseScale * 3;
+  const destW = frameW * scale;
+  const destH = frameH * scale;
+  ctx.save();
+  ctx.globalAlpha = 0.85;
+  ctx.drawImage(effect.image, sx, sy, frameW, frameH, screenX - destW / 2, screenY - destH / 2, destW, destH);
+  ctx.restore();
+}
+
+function drawBobberWaveEffect(W, metrics, lateralScale) {
+  const effect = waveEffect;
+  if (!effect || !effect.playing || !effect.image) return;
+  const cols = Math.max(1, Math.floor(effect.sheetColumns || 1));
+  const rows = Math.max(1, Math.floor(effect.sheetRows || Math.ceil(effect.frameCount / cols)));
+  const frameW = effect.frameWidth || Math.floor(effect.image.width / cols);
+  const frameH = effect.frameHeight || Math.floor(effect.image.height / rows);
+  if (!frameW || !frameH) return;
+  const frameIndex = Math.max(0, Math.min(effect.frameCount - 1, Math.floor(effect.frameIndex)));
+  const col = frameIndex % cols;
+  const row = Math.floor(frameIndex / cols);
+  const sx = col * frameW;
+  const sy = row * frameH;
+  const distancePx = effect.distance * metrics.pxPerMeter;
+  const worldY = metrics.waterSurfaceY - distancePx;
+  const screenY = worldY + camera.y;
+  const lateral = effect.lateral || 0;
+  const screenX = W * 0.5 + metrics.bobberOffsetX + lateral * lateralScale;
+  const scale = Math.min(1.45, Math.max(0.6, (metrics.tileW * 1.2) / Math.max(1, frameW)));
+  const destW = frameW * scale;
+  const destH = frameH * scale;
+  ctx.save();
+  ctx.globalAlpha = 0.85;
+  ctx.drawImage(effect.image, sx, sy, frameW, frameH, screenX - destW / 2, screenY - destH / 2, destW, destH);
+  ctx.restore();
+}
+
 // 카메라 업데이트
 function updateCamera(distance, metrics, dt, state) {
   const distancePx = clamp(distance * metrics.pxPerMeter, 0, metrics.distancePxRange);
