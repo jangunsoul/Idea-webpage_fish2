@@ -480,8 +480,8 @@
   function scatterFishesAroundTarget(distance) {
     if (!Array.isArray(window.world.fishes) || !window.world.fishes.length) return;
     const fishes = window.world.fishes;
-    const scatterDuration = window.FISH_SCATTER_DURATION ?? 1.6;
-    const alertDuration = window.FISH_ALERT_DURATION ?? 2;
+    const scatterDuration = window.FISH_SCATTER_DURATION ?? 1;
+    const alertDuration = window.FISH_ALERT_DURATION ?? 1;
     const minRadius = window.FISH_SCATTER_MIN_RADIUS ?? 4;
     const force = window.FISH_SCATTER_FORCE ?? 14;
 
@@ -510,9 +510,9 @@
       if (!fish.velocity) fish.velocity = { x: 0, y: 0 };
       if (!fish.targetVelocity) fish.targetVelocity = { x: 0, y: 0 };
 
-      const speed = Math.max(force, (fish.swimSpeed || 6) * 1.4);
-      fish.targetVelocity.x = safeDirX * speed;
-      fish.targetVelocity.y = safeDirY * speed * 0.7;
+      const baseSpeed = Math.max(fish.swimSpeed || force, 0);
+      fish.targetVelocity.x = safeDirX * baseSpeed;
+      fish.targetVelocity.y = safeDirY * baseSpeed * 0.7;
       fish.velocity.x = fish.targetVelocity.x;
       fish.velocity.y = fish.targetVelocity.y;
       fish.moving = true;
@@ -1023,7 +1023,7 @@
           window.ctx.setLineDash([]);
         }
         if (fish.alertTimer > 0) {
-          const alertDuration = window.FISH_ALERT_DURATION ?? 2;
+          const alertDuration = window.FISH_ALERT_DURATION ?? 1;
           const progress = window.clamp(fish.alertTimer / Math.max(0.001, alertDuration), 0, 1);
           const bounce = Math.sin((1 - progress) * Math.PI * 2) * 4;
           const bubbleRadius = 12;

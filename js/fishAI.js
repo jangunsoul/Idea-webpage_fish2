@@ -71,7 +71,7 @@ function updateFishSimulation(dt) {
     let desiredVY = fish.targetVelocity.y || 0;
 
     if (fish.alertTimer > 0 && fish.alertVector) {
-      const scatterSpeed = Math.max(wanderSpeed * 2, window.FISH_SCATTER_FORCE ?? 12);
+      const scatterSpeed = Math.max(swimSpeed, 0);
       desiredVX = fish.alertVector.x * scatterSpeed;
       desiredVY = fish.alertVector.y * scatterSpeed * 0.7;
       fish.moving = true;
