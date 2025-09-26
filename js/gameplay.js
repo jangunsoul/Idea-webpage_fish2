@@ -26,6 +26,8 @@ function spawnFishes(dist, options = {}) {
 
   const sampleLateral = () => rand(-halfWidth, halfWidth);
 
+  const populationScale = clamp(window.FISH_POPULATION_SCALE ?? 0.4, 0.1, 1);
+
   const spawnAtDistance = distance => {
     const spec = sampleSpecies();
     if (!spec) return;
@@ -71,7 +73,7 @@ function spawnFishes(dist, options = {}) {
   if (spread) {
     for (let base = minDistance; base <= maxDistance; base += segmentSize) {
       const countBase = randi(2, 3);
-      const count = Math.max(1, Math.round(countBase * 0.7));
+      const count = Math.max(1, Math.round(countBase * populationScale));
       for (let i = 0; i < count; i++) {
         const offset = rand(-segmentSize * 0.45, segmentSize * 0.45);
         const distance = clamp(base + offset, minDistance, maxDistance);
@@ -80,7 +82,7 @@ function spawnFishes(dist, options = {}) {
     }
   } else {
     const density = randi(7, 11);
-    const reduced = Math.max(1, Math.round(density * 0.7));
+    const reduced = Math.max(1, Math.round(density * populationScale));
     for (let i = 0; i < reduced; i++) {
       const distance = clamp(rand(minDistance, maxDistance), minDistance, maxDistance);
       spawnAtDistance(distance);

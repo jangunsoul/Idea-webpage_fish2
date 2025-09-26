@@ -482,8 +482,10 @@
     const fishes = window.world.fishes;
     const scatterDuration = window.FISH_SCATTER_DURATION ?? 1;
     const alertDuration = window.FISH_ALERT_DURATION ?? 1;
-    const scareRadius = window.BOBBER_SCARE_RADIUS ?? window.FISH_SCATTER_MIN_RADIUS ?? 1.5;
+    const scareRadius = window.BOBBER_SCARE_RADIUS ?? window.FISH_SCATTER_MIN_RADIUS ?? 1;
     const force = window.FISH_SCATTER_FORCE ?? 14;
+    const baseChance = window.BOBBER_SCARE_BASE_CHANCE ?? 0.4;
+    const rarityChances = window.BOBBER_SCARE_PROBABILITY || {};
 
     for (const fish of fishes) {
       if (!fish || fish.finished) continue;
@@ -492,6 +494,10 @@
       const dy = (position.y ?? fish.distance ?? distance) - distance;
       const dist = Math.sqrt(dx * dx + dy * dy);
       if (!Number.isFinite(dist) || dist > scareRadius) continue;
+
+      const rarity = fish.spec?.rarity || 'Common';
+      const chance = Math.min(1, Math.max(0, rarityChances[rarity] ?? baseChance));
+      if (Math.random() > chance) continue;
 
       let dirX = dx;
       let dirY = dy;
