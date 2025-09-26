@@ -92,6 +92,7 @@ window.mainMenu = null;
 window.titleBar = null;
 window.navBar = null;
 window.exitBtn = null;
+window.autoBtn = null;
 window.shopBtn = null;
 window.rankBtn = null;
 window.premiumBtn = null;
@@ -129,6 +130,9 @@ window.CHARACTERS = window.gameData.characters;
 
 window.settings = {
   energy: 10,
+  energyMax: 10,
+  energyRegenInterval: 600,
+  energyCooldown: 0,
   points: 0,
   baseCast: 30,
   maxCast: 200,
@@ -154,7 +158,16 @@ window.world = {
   sinkDuration: 0,
   sinkStartDist: 0,
   sinkEndDist: 0,
-  pendingCatchSims: []
+  battleQueue: [],
+  battleResults: [],
+  currentBattleIndex: -1,
+  pendingPointTotal: 0,
+  autoMode: false,
+  autoHoldActive: false,
+  autoCastTimer: 0,
+  autoReleaseDelay: 0,
+  autoTargetDistance: null,
+  autoArmed: false
 };
 
 window.camera = { y: 0 };

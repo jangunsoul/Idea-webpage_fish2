@@ -69,6 +69,42 @@
       font-size: 14px;
       font-weight: 600;
       backdrop-filter: blur(10px);
+      position: relative;
+      overflow: hidden;
+    }
+
+    #energy.overcap {
+      color: #22c55e;
+    }
+
+    .pill.sparkle {
+      animation: sparkleFlash 0.9s ease-out;
+      box-shadow: 0 0 24px rgba(111, 255, 233, 0.45);
+    }
+
+    .pill.sparkle::after {
+      content: '';
+      position: absolute;
+      top: -40%;
+      left: -30%;
+      width: 40%;
+      height: 180%;
+      background: linear-gradient(120deg, rgba(111, 255, 233, 0), rgba(255, 255, 255, 0.75), rgba(111, 255, 233, 0));
+      transform: rotate(25deg);
+      animation: sparkleSweep 0.9s ease-out;
+      pointer-events: none;
+    }
+
+    @keyframes sparkleFlash {
+      0% { transform: scale(1); box-shadow: 0 0 0 rgba(111, 255, 233, 0.1); }
+      40% { transform: scale(1.05); box-shadow: 0 0 28px rgba(111, 255, 233, 0.55); }
+      100% { transform: scale(1); box-shadow: 0 0 12px rgba(111, 255, 233, 0.2); }
+    }
+
+    @keyframes sparkleSweep {
+      0% { transform: translateX(0) rotate(25deg); opacity: 0; }
+      40% { opacity: 1; }
+      100% { transform: translateX(220%) rotate(25deg); opacity: 0; }
     }
 
     #titleBar {
@@ -227,6 +263,36 @@
       background: rgba(15, 23, 42, 0.95);
     }
 
+    #autoBtn {
+      position: absolute;
+      bottom: 90px;
+      right: 24px;
+      padding: 10px 20px;
+      border-radius: 16px;
+      background: rgba(2, 8, 23, 0.85);
+      color: var(--text);
+      font-weight: 600;
+      letter-spacing: 0.04em;
+      border: 1px solid rgba(255, 255, 255, 0.12);
+      cursor: pointer;
+      z-index: 40;
+      opacity: 0;
+      pointer-events: none;
+      transform: translateY(16px);
+      transition: opacity 0.35s ease, transform 0.35s ease, background 0.25s ease, border-color 0.25s ease;
+    }
+
+    #autoBtn.active {
+      background: rgba(91, 192, 190, 0.18);
+      border-color: rgba(111, 255, 233, 0.45);
+      color: var(--secondary);
+    }
+
+    #autoBtn:hover {
+      border-color: rgba(111, 255, 233, 0.45);
+      background: rgba(15, 23, 42, 0.95);
+    }
+
     .cast-prompt {
       position: absolute;
       top: 75%;
@@ -280,6 +346,12 @@
     }
 
     #game.gameplay #exitBtn {
+      opacity: 1;
+      pointer-events: auto;
+      transform: translateY(0);
+    }
+
+    #game.gameplay #autoBtn {
       opacity: 1;
       pointer-events: auto;
       transform: translateY(0);
@@ -440,6 +512,274 @@
       backdrop-filter: blur(10px);
     }
 
+    .battle-modal .battle-card,
+    .battle-summary .battle-summary-card {
+      background: linear-gradient(160deg, rgba(28, 37, 65, 0.95), rgba(15, 23, 42, 0.92));
+      border: 1px solid rgba(111, 255, 233, 0.18);
+      box-shadow: 0 18px 40px rgba(2, 8, 23, 0.65);
+      padding: 28px 26px;
+      border-radius: 22px;
+      width: min(420px, 92vw);
+      color: var(--text);
+      position: relative;
+      overflow: hidden;
+    }
+
+    .battle-card h3 {
+      font-size: 1.6rem;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      margin-bottom: 22px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 12px;
+      text-align: center;
+    }
+
+    .battle-card h3 .battle-title {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 6px;
+    }
+
+    .battle-card h3 .battle-counter {
+      font-size: 1rem;
+      letter-spacing: 0.05em;
+      text-transform: none;
+      color: var(--secondary);
+    }
+
+    .battle-gauge {
+      margin: 0 auto 22px;
+      width: 100%;
+      max-width: 320px;
+    }
+
+    .gauge-track {
+      position: relative;
+      width: 100%;
+      height: 26px;
+      border-radius: 18px;
+      overflow: hidden;
+      background: rgba(148, 163, 184, 0.25);
+      border: 1px solid rgba(111, 255, 233, 0.25);
+    }
+
+    .gauge-white {
+      position: absolute;
+      top: 0;
+      bottom: 0;
+      background: linear-gradient(90deg, rgba(255,255,255,0.85), rgba(241,245,249,0.6));
+      border-radius: 18px;
+    }
+
+    .gauge-red {
+      position: absolute;
+      top: 0;
+      bottom: 0;
+      left: 50%;
+      transform: translateX(-50%);
+      width: 22%;
+      background: linear-gradient(90deg, rgba(248, 113, 113, 0.92), rgba(239, 68, 68, 0.92));
+      box-shadow: inset 0 0 15px rgba(127, 29, 29, 0.6);
+    }
+
+    .gauge-fish {
+      position: absolute;
+      top: 50%;
+      width: 16px;
+      height: 16px;
+      background: #111827;
+      border-radius: 8px;
+      transform: translate(-50%, -50%);
+      box-shadow: 0 0 12px rgba(0, 0, 0, 0.45);
+    }
+
+    .battle-fish {
+      position: relative;
+      height: 140px;
+      margin-bottom: 16px;
+    }
+
+    .battle-fish-image {
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      transition: transform 0.5s ease, filter 0.5s ease;
+      max-width: 220px;
+    }
+
+    .battle-fish-image img,
+    .battle-fish-image .placeholder {
+      display: block;
+      width: 100%;
+      height: auto;
+      filter: drop-shadow(0 16px 25px rgba(0, 0, 0, 0.45));
+    }
+
+    .battle-fish-image img {
+      transition: transform 0.25s ease;
+    }
+
+    .battle-fish-image.flip img {
+      transform: scaleX(-1);
+    }
+
+    .battle-fish-image .placeholder {
+      width: 180px;
+      height: 64px;
+      border-radius: 18px;
+      background: rgba(30, 64, 175, 0.25);
+      border: 1px dashed rgba(148, 163, 184, 0.4);
+    }
+
+    .battle-fish-image.celebrate {
+      transform: translate(-50%, -50%) scale(1.2);
+      filter: drop-shadow(0 0 24px rgba(111, 255, 233, 0.55));
+    }
+
+    .battle-fish-image .treasure-chest {
+      position: absolute;
+      width: 140px;
+      height: 96px;
+      border-radius: 16px 16px 20px 20px;
+      background: linear-gradient(180deg, #facc15, #d97706 65%, #92400e);
+      box-shadow: 0 16px 32px rgba(234, 179, 8, 0.4);
+      overflow: hidden;
+      transform: translate(-50%, -50%);
+      left: 50%;
+      top: 50%;
+    }
+
+    .battle-fish-image .treasure-chest::before {
+      content: '';
+      position: absolute;
+      left: 0;
+      right: 0;
+      top: 0;
+      height: 42%;
+      background: linear-gradient(180deg, #fde68a, #f59e0b);
+      border-bottom: 4px solid rgba(146, 64, 14, 0.4);
+    }
+
+    .battle-fish-image .treasure-chest::after {
+      content: '';
+      position: absolute;
+      left: 50%;
+      top: 30%;
+      width: 18px;
+      height: 38px;
+      background: linear-gradient(180deg, #7c2d12, #fbbf24);
+      border-radius: 6px;
+      transform: translateX(-50%);
+      box-shadow: inset 0 0 6px rgba(0, 0, 0, 0.35);
+    }
+
+    .battle-fish-image .treasure-chest .shine {
+      position: absolute;
+      left: -40%;
+      top: -20%;
+      width: 60%;
+      height: 160%;
+      background: linear-gradient(120deg, rgba(255, 255, 255, 0), rgba(255, 255, 255, 0.65), rgba(255, 255, 255, 0));
+      transform: rotate(25deg);
+      animation: chestShimmer 2.6s linear infinite;
+    }
+
+    @keyframes chestShimmer {
+      0% { transform: translateX(0) rotate(25deg); opacity: 0; }
+      40% { opacity: 1; }
+      100% { transform: translateX(220%) rotate(25deg); opacity: 0; }
+    }
+
+    .battle-status {
+      font-size: 1.2rem;
+      font-weight: 700;
+      letter-spacing: 0.04em;
+      min-height: 1.4em;
+      margin-bottom: 12px;
+      text-align: center;
+    }
+
+    .battle-status.success { color: var(--success); }
+    .battle-status.fail { color: var(--error); }
+
+    .battle-info {
+      text-align: center;
+      font-size: 0.95rem;
+      line-height: 1.5;
+      color: var(--text-dim);
+      min-height: 60px;
+    }
+
+    .battle-info strong { color: var(--secondary); }
+
+    .battle-actions {
+      display: flex;
+      justify-content: center;
+      margin-top: 22px;
+      gap: 12px;
+    }
+
+    .battle-actions .btn { min-width: 140px; }
+
+    .battle-actions .btn.disabled {
+      pointer-events: none;
+      opacity: 0.5;
+    }
+
+    .battle-next-countdown {
+      align-self: center;
+      font-weight: 600;
+      color: var(--text-dim);
+      min-width: 96px;
+      text-align: left;
+      opacity: 0;
+      transition: opacity 0.2s ease;
+    }
+
+    .battle-next-countdown.show {
+      opacity: 1;
+    }
+
+    .battle-summary-card h3 {
+      font-size: 1.5rem;
+      margin-bottom: 18px;
+      letter-spacing: 0.06em;
+      text-transform: uppercase;
+    }
+
+    .battle-summary-list {
+      max-height: 220px;
+      overflow-y: auto;
+      margin-bottom: 18px;
+      padding-right: 6px;
+    }
+
+    .battle-summary-list p {
+      font-size: 0.95rem;
+      margin-bottom: 8px;
+      display: flex;
+      justify-content: space-between;
+      gap: 12px;
+    }
+
+    .battle-summary-list .summary-energy {
+      justify-content: center;
+      color: var(--secondary);
+      font-weight: 600;
+    }
+
+    .battle-summary-total {
+      font-weight: 700;
+      font-size: 1.1rem;
+      text-align: center;
+      margin-bottom: 18px;
+    }
+
     .card {
       background: var(--bg-light);
       padding: 30px;
@@ -525,7 +865,7 @@
 
     <div class="hud">
       <div class="left">
-        <div class="pill">⚡ Energy: <span id="energy">10</span></div>
+        <div class="pill">⚡ Energy: <span id="energy">10/10</span></div>
       </div>
       <div class="right">
         <div class="pill">🎣 Points: <span id="points">0</span></div>
@@ -544,6 +884,7 @@
     </div>
 
     <button id="exitBtn" type="button">Exit</button>
+    <button id="autoBtn" type="button" aria-pressed="false">Auto</button>
 
     <div class="version-tag" id="versionTag" aria-hidden="true">v1.0.3</div>
     <div class="toast" id="toast"></div>
@@ -565,6 +906,40 @@
         <div class="actions">
           <div class="btn" id="rSkip">Skip</div>
           <div class="btn primary" id="rNext">Next</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="modal battle-modal" id="reelBattleModal" aria-hidden="true">
+      <div class="battle-card">
+        <h3><span class="battle-title" id="battleTitle">Reel battle</span><span class="battle-counter" id="battleCounter"></span></h3>
+        <div class="battle-gauge">
+          <div class="gauge-track">
+            <div class="gauge-white" id="battleGaugeWhite"></div>
+            <div class="gauge-red"></div>
+            <div class="gauge-fish" id="battleGaugeFish"></div>
+          </div>
+        </div>
+        <div class="battle-fish">
+          <div class="battle-fish-image" id="battleFishImage"></div>
+        </div>
+        <div class="battle-status" id="battleStatus"></div>
+        <div class="battle-info" id="battleInfo"></div>
+        <div class="battle-actions">
+          <button class="btn primary" id="battleNext" type="button">Next</button>
+          <span class="battle-next-countdown" id="battleNextCountdown"></span>
+        </div>
+      </div>
+    </div>
+
+    <div class="modal battle-summary" id="catchSummary" aria-hidden="true">
+      <div class="battle-summary-card">
+        <h3>Catch Summary</h3>
+        <div class="battle-summary-list" id="summaryList"></div>
+        <div class="battle-summary-total">Total Point: <span id="summaryTotal">0</span></div>
+        <div class="battle-actions">
+          <button class="btn primary" id="summaryClose" type="button">Close</button>
+          <span class="battle-next-countdown summary-countdown" id="summaryCountdown"></span>
         </div>
       </div>
     </div>

@@ -59,8 +59,39 @@ window.showMissEffect = function showMissEffect() {
 };
 
 window.setHUD = function setHUD() {
-  if (window.energyEl) window.energyEl.textContent = window.settings.energy;
+  if (window.energyEl) {
+    const energy = window.settings.energy ?? 0;
+    const maxEnergy = window.settings.energyMax ?? 10;
+    const cooldown = window.settings.energyCooldown ?? 0;
+    let text = `${energy}/${maxEnergy}`;
+    if (energy < maxEnergy) {
+      const seconds = Math.max(0, Math.ceil(cooldown) - 1);
+      const minutesPart = Math.floor(seconds / 60)
+        .toString()
+        .padStart(2, '0');
+      const secondsPart = (seconds % 60).toString().padStart(2, '0');
+      text += ` (${minutesPart}:${secondsPart})`;
+    }
+    window.energyEl.textContent = text;
+    window.energyEl.classList.toggle('overcap', energy > maxEnergy);
+  }
   if (window.pointsEl) window.pointsEl.textContent = window.settings.points;
+};
+
+window.addPointsWithSparkle = function addPointsWithSparkle(amount) {
+  if (!Number.isFinite(amount) || amount === 0) {
+    window.setHUD();
+    return;
+  }
+  window.settings.points += amount;
+  window.setHUD();
+  const target = window.pointsEl?.closest?.('.pill') || window.pointsEl;
+  if (!target) return;
+  target.classList.remove('sparkle');
+  void target.offsetWidth;
+  target.classList.add('sparkle');
+  clearTimeout(target._sparkleTimer);
+  target._sparkleTimer = setTimeout(() => target.classList.remove('sparkle'), 900);
 };
 
 window.setGameplayLayout = function setGameplayLayout(active) {
@@ -93,6 +124,11 @@ window.setGameplayLayout = function setGameplayLayout(active) {
   if (window.exitBtn) {
     window.exitBtn.setAttribute('aria-hidden', active ? 'false' : 'true');
     window.exitBtn.tabIndex = active ? 0 : -1;
+  }
+
+  if (window.autoBtn) {
+    window.autoBtn.setAttribute('aria-hidden', active ? 'false' : 'true');
+    window.autoBtn.tabIndex = active ? 0 : -1;
   }
 };
 
