@@ -181,9 +181,19 @@
       if (!window.gameData.environment?.tileHeight) window.environmentState.tileHeight = img.height;
     });
     queue(sources.land, img => { window.environmentState.land = img; });
+    queue('assets/characters/wood.png', img => { window.environmentState.dock = img; });
     if (window.characterSprite.spriteSource) {
       queue(window.characterSprite.spriteSource, img => { window.characterSprite.image = img; });
     }
+    queue('assets/characters/waterwave.png', img => {
+      window.waveEffect.image = img;
+      if (img && img.width && img.height) {
+        const cols = Math.max(1, Math.floor(window.waveEffect.sheetColumns || 1));
+        const rows = Math.max(1, Math.floor(window.waveEffect.sheetRows || Math.ceil(window.waveEffect.frameCount / cols)));
+        window.waveEffect.frameWidth = Math.floor(img.width / cols);
+        window.waveEffect.frameHeight = Math.floor(img.height / rows);
+      }
+    });
 
     window.assetPrepPromise = Promise.all(tasks).then(() => {
       window.gameData.resources.fish = fishCache;
@@ -304,6 +314,11 @@
     window.world.sinkStartDist = TARGET_MIN_DISTANCE;
     window.world.sinkEndDist = TARGET_MIN_DISTANCE;
     window.world.pendingCatchSims = [];
+    if (window.waveEffect) {
+      window.waveEffect.playing = false;
+      window.waveEffect.frameIndex = 0;
+      window.waveEffect.timer = 0;
+    }
   }
 
   function updateDistanceReadout() {
@@ -329,6 +344,11 @@
     window.world.targetZoom = 1;
     window.world.viewZoom = 1;
     window.world.bobberVisible = false;
+    if (window.waveEffect) {
+      window.waveEffect.playing = false;
+      window.waveEffect.frameIndex = 0;
+      window.waveEffect.timer = 0;
+    }
     if (respawn || !Array.isArray(window.world.fishes) || !window.world.fishes.length) {
       respawnFishPopulation();
     } else {
@@ -338,6 +358,17 @@
         fish.engaged = false;
         fish.active = null;
         fish.escapeTimer = 0;
+        if (fish.position && Number.isFinite(fish.position.y)) {
+          fish.homeY = fish.homeY ?? fish.position.y;
+        } else if (Number.isFinite(fish.distance)) {
+          fish.homeY = fish.homeY ?? fish.distance;
+        }
+        if (!Number.isFinite(fish.verticalRange)) {
+          fish.verticalRange = window.FISH_VERTICAL_HOME_RANGE ?? 32;
+        }
+        fish.alertTimer = 0;
+        fish.alertVector = null;
+        fish.wanderTimer = window.rand(0.6, 1.4);
       }
     }
     resetTargetCircle();
@@ -377,6 +408,11 @@
     resetCharacterToIdle();
     window.setGameplayLayout(false);
     updateDistanceReadout();
+    if (window.waveEffect) {
+      window.waveEffect.playing = false;
+      window.waveEffect.frameIndex = 0;
+      window.waveEffect.timer = 0;
+    }
   }
 
   function startPlaySession() {
@@ -427,6 +463,71 @@
     window.world.pendingCatchSims = [];
   }
 
+  function triggerBobberImpact(distance) {
+    if (!window.waveEffect || !window.waveEffect.image) {
+      if (window.waveEffect) {
+        window.waveEffect.distance = distance;
+      }
+      return;
+    }
+    window.waveEffect.playing = true;
+    window.waveEffect.frameIndex = 0;
+    window.waveEffect.timer = 0;
+    window.waveEffect.distance = distance;
+    window.waveEffect.lateral = 0;
+  }
+
+  function scatterFishesAroundTarget(distance) {
+    if (!Array.isArray(window.world.fishes) || !window.world.fishes.length) return;
+    const fishes = window.world.fishes;
+    const scatterDuration = window.FISH_SCATTER_DURATION ?? 1;
+    const alertDuration = window.FISH_ALERT_DURATION ?? 1;
+    const scareRadius = window.BOBBER_SCARE_RADIUS ?? window.FISH_SCATTER_MIN_RADIUS ?? 1;
+    const force = window.FISH_SCATTER_FORCE ?? 14;
+    const baseChance = window.BOBBER_SCARE_BASE_CHANCE ?? 0.4;
+    const rarityChances = window.BOBBER_SCARE_PROBABILITY || {};
+
+    for (const fish of fishes) {
+      if (!fish || fish.finished) continue;
+      const position = fish.position || { x: 0, y: fish.distance ?? distance };
+      const dx = position.x;
+      const dy = (position.y ?? fish.distance ?? distance) - distance;
+      const dist = Math.sqrt(dx * dx + dy * dy);
+      if (!Number.isFinite(dist) || dist > scareRadius) continue;
+
+      const rarity = fish.spec?.rarity || 'Common';
+      const chance = Math.min(1, Math.max(0, rarityChances[rarity] ?? baseChance));
+      if (Math.random() > chance) continue;
+
+      let dirX = dx;
+      let dirY = dy;
+      if (!Number.isFinite(dirX) || !Number.isFinite(dirY) || Math.abs(dirX) + Math.abs(dirY) < 0.001) {
+        const angle = Math.random() * Math.PI * 2;
+        dirX = Math.cos(angle);
+        dirY = Math.sin(angle);
+      }
+      const length = Math.hypot(dirX, dirY) || 1;
+      const safeDirX = dirX / length;
+      const safeDirY = dirY / length;
+
+      if (!fish.position) fish.position = { x: 0, y: fish.distance ?? distance };
+      if (!fish.velocity) fish.velocity = { x: 0, y: 0 };
+      if (!fish.targetVelocity) fish.targetVelocity = { x: 0, y: 0 };
+
+      const baseSpeed = Math.max(fish.swimSpeed || force, 0);
+      fish.targetVelocity.x = safeDirX * baseSpeed;
+      fish.targetVelocity.y = safeDirY * baseSpeed * 0.7;
+      fish.velocity.x = fish.targetVelocity.x;
+      fish.velocity.y = fish.targetVelocity.y;
+      fish.moving = true;
+      fish.escapeTimer = Math.max(fish.escapeTimer ?? 0, scatterDuration);
+      fish.alertTimer = alertDuration;
+      fish.alertVector = { x: safeDirX, y: safeDirY };
+      if (typeof fish.wanderTimer === 'number') fish.wanderTimer = Math.min(fish.wanderTimer, 0.1);
+      fish.stressLevel = Math.min(1, (fish.stressLevel ?? 0) + 0.4);
+    }
+  }
+
   function beginSinkPhase() {
     if (window.world.castStage !== 'aiming') return;
     const target = window.world.targetCircle;
@@ -440,6 +541,8 @@
     window.world.sinkEndDist = window.clamp(dropTarget, SINK_MIN_DISTANCE, target.distance);
     window.world.bobberDist = target.distance;
     window.world.castDistance = target.distance;
+    scatterFishesAroundTarget(target.distance);
+    triggerBobberImpact(target.distance);
     clearCatchSimulations();
     window.world.targetCircle = null;
     setCastPrompt(true, 'Pull!');
@@ -498,6 +601,23 @@
     updateCatchSimulations(dt);
     if (window.world.sinkTimer >= duration) {
       finalizeCatchAttempt();
+    }
+  }
+
+  function updateBobberWave(dt) {
+    const effect = window.waveEffect;
+    if (!effect || !effect.playing || !effect.image) return;
+    const frameDuration = effect.frameDuration > 0 ? effect.frameDuration : 0.08;
+    effect.timer += dt;
+    while (effect.timer >= frameDuration) {
+      effect.timer -= frameDuration;
+      effect.frameIndex += 1;
+      if (effect.frameIndex >= effect.frameCount) {
+        effect.playing = false;
+        effect.frameIndex = effect.frameCount - 1;
+        effect.timer = 0;
+        break;
+      }
     }
   }
 
@@ -854,6 +974,7 @@
         drawTargetCircle(bobberX, targetCircleScreenY);
       }
       if (window.world.bobberVisible) {
+        drawBobberWaveEffect(W, metrics, lateralScale);
         drawFishingLine(window.rodAnchor.x, window.rodAnchor.y, bobberX, bobberScreenY);
         drawBobber(bobberX, bobberScreenY);
       }
@@ -868,10 +989,12 @@
           continue;
         }
         const fishImage = window.gameData.resources.fish.get(fish.specId);
+        let drawnHeight = 18;
         if (fishImage) {
           const fishScale = 0.75;
           const fishW = fishImage.width * fishScale;
           const fishH = fishImage.height * fishScale;
+          drawnHeight = fishH;
           const facingRight = !!fish.facingRight;
           if (facingRight) {
             window.ctx.save();
@@ -884,6 +1007,7 @@
           }
         } else {
           const fishSize = 10;
+          drawnHeight = fishSize * 1.2;
           window.ctx.fillStyle = fish.iconColor;
           window.ctx.beginPath();
           window.ctx.ellipse(fishScreenX, fishScreenY, fishSize, fishSize * 0.6, 0, 0, Math.PI * 2);
@@ -901,6 +1025,36 @@
           window.ctx.arc(fishScreenX, fishScreenY, 14, 0, Math.PI * 2);
           window.ctx.stroke();
           window.ctx.setLineDash([]);
+        }
+        if (fish.alertTimer > 0) {
+          const alertDuration = window.FISH_ALERT_DURATION ?? 1;
+          const progress = window.clamp(fish.alertTimer / Math.max(0.001, alertDuration), 0, 1);
+          const bounce = Math.sin((1 - progress) * Math.PI * 2) * 4;
+          const bubbleRadius = 12;
+          const bubbleX = fishScreenX;
+          const bubbleY = fishScreenY - drawnHeight / 2 - bubbleRadius - 6 + bounce;
+          window.ctx.save();
+          window.ctx.globalAlpha = 0.92;
+          window.ctx.fillStyle = '#ffffff';
+          window.ctx.beginPath();
+          window.ctx.arc(bubbleX, bubbleY, bubbleRadius, 0, Math.PI * 2);
+          window.ctx.fill();
+          window.ctx.strokeStyle = '#ef4444';
+          window.ctx.lineWidth = 2;
+          window.ctx.stroke();
+          window.ctx.beginPath();
+          window.ctx.moveTo(bubbleX - 4, bubbleY + bubbleRadius - 2);
+          window.ctx.lineTo(bubbleX, bubbleY + bubbleRadius + 6);
+          window.ctx.lineTo(bubbleX + 4, bubbleY + bubbleRadius - 2);
+          window.ctx.closePath();
+          window.ctx.fill();
+          window.ctx.stroke();
+          window.ctx.fillStyle = '#ef4444';
+          window.ctx.font = 'bold 14px sans-serif';
+          window.ctx.textAlign = 'center';
+          window.ctx.textBaseline = 'middle';
+          window.ctx.fillText('!', bubbleX, bubbleY + 1);
+          window.ctx.restore();
         }
       }
 
@@ -929,6 +1083,7 @@
 
     updateCharacterAnimation(dt);
     updateFishSimulation(dt);
+    updateBobberWave(dt);
 
     const metrics = getEnvironmentMetrics(window.canvas.width, window.canvas.height);
     if (window.state === window.GameState.Targeting) {
