@@ -92,12 +92,19 @@ window.mainMenu = null;
 window.titleBar = null;
 window.navBar = null;
 window.exitBtn = null;
+window.autoBtn = null;
 window.shopBtn = null;
+window.shopModal = null;
+window.shopCloseBtn = null;
+window.shopProducts = null;
+window.shopPointsEl = null;
 window.rankBtn = null;
 window.premiumBtn = null;
 window.toastEl = null;
 window.missEffect = null;
 window.distanceEl = null;
+window.autoCountdownEl = null;
+window.autoCountdownTimerEl = null;
 window.minimap = null;
 window.mmbar = null;
 window.mmCells = null;
@@ -129,7 +136,10 @@ window.CHARACTERS = window.gameData.characters;
 
 window.settings = {
   energy: 10,
-  points: 0,
+  energyMax: 10,
+  energyRegenInterval: 600,
+  energyCooldown: 0,
+  points: 3000,
   baseCast: 30,
   maxCast: 200,
   rodTier: 1,
@@ -154,7 +164,19 @@ window.world = {
   sinkDuration: 0,
   sinkStartDist: 0,
   sinkEndDist: 0,
-  pendingCatchSims: []
+  battleQueue: [],
+  battleResults: [],
+  currentBattleIndex: -1,
+  pendingPointTotal: 0,
+  autoMode: false,
+  autoHoldActive: false,
+  autoCastTimer: 0,
+  autoReleaseDelay: 0,
+  autoTargetDistance: null,
+  autoArmed: false,
+  autoCountdownActive: false,
+  autoCountdownTimer: 0,
+  autoCountdownCallback: null
 };
 
 window.camera = { y: 0 };

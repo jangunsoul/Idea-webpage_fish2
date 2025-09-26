@@ -59,8 +59,81 @@ window.showMissEffect = function showMissEffect() {
 };
 
 window.setHUD = function setHUD() {
-  if (window.energyEl) window.energyEl.textContent = window.settings.energy;
-  if (window.pointsEl) window.pointsEl.textContent = window.settings.points;
+  if (window.energyEl) {
+    const energy = window.settings.energy ?? 0;
+    const maxEnergy = window.settings.energyMax ?? 10;
+    const cooldown = window.settings.energyCooldown ?? 0;
+    let text = `${energy}/${maxEnergy}`;
+    if (energy < maxEnergy) {
+      const seconds = Math.max(0, Math.ceil(cooldown) - 1);
+      const minutesPart = Math.floor(seconds / 60)
+        .toString()
+        .padStart(2, '0');
+      const secondsPart = (seconds % 60).toString().padStart(2, '0');
+      text += ` (${minutesPart}:${secondsPart})`;
+    }
+    window.energyEl.textContent = text;
+    window.energyEl.classList.toggle('overcap', energy > maxEnergy);
+  }
+  const pointsText = (window.settings.points ?? 0).toLocaleString();
+  if (window.pointsEl) window.pointsEl.textContent = pointsText;
+  if (window.shopPointsEl) window.shopPointsEl.textContent = pointsText;
+  if (typeof window.updateShopAvailability === 'function') {
+    window.updateShopAvailability();
+  }
+};
+
+window.addPointsWithSparkle = function addPointsWithSparkle(amount) {
+  if (!Number.isFinite(amount) || amount === 0) {
+    window.setHUD();
+    return;
+  }
+  window.settings.points += amount;
+  window.setHUD();
+  const target = window.pointsEl?.closest?.('.pill') || window.pointsEl;
+  if (!target) return;
+  target.classList.remove('sparkle');
+  void target.offsetWidth;
+  target.classList.add('sparkle');
+  clearTimeout(target._sparkleTimer);
+  target._sparkleTimer = setTimeout(() => target.classList.remove('sparkle'), 900);
+};
+
+window.spendPoints = function spendPoints(cost) {
+  if (!Number.isFinite(cost) || cost <= 0) return true;
+  const current = window.settings.points ?? 0;
+  if (current < cost) return false;
+  window.settings.points = current - cost;
+  window.setHUD();
+  return true;
+};
+
+window.addEnergy = function addEnergy(amount, options = {}) {
+  if (!Number.isFinite(amount) || amount === 0) {
+    window.setHUD();
+    return window.settings.energy ?? 0;
+  }
+  const maxEnergy = window.settings.energyMax ?? 10;
+  const regenInterval = window.settings.energyRegenInterval ?? 600;
+  const current = window.settings.energy ?? 0;
+  const next = Math.max(0, current + amount);
+  window.settings.energy = next;
+  if (next >= maxEnergy) {
+    window.settings.energyCooldown = 0;
+  } else if (amount > 0) {
+    if (!Number.isFinite(window.settings.energyCooldown) || window.settings.energyCooldown <= 0) {
+      window.settings.energyCooldown = regenInterval;
+    }
+  }
+  window.setHUD();
+  if (options.toast) {
+    const message =
+      typeof options.toast === 'string'
+        ? options.toast
+        : `Energy ${amount > 0 ? '+' : ''}${amount}`;
+    window.toast(message);
+  }
+  return window.settings.energy;
 };
 
 window.setGameplayLayout = function setGameplayLayout(active) {
@@ -93,6 +166,11 @@ window.setGameplayLayout = function setGameplayLayout(active) {
   if (window.exitBtn) {
     window.exitBtn.setAttribute('aria-hidden', active ? 'false' : 'true');
     window.exitBtn.tabIndex = active ? 0 : -1;
+  }
+
+  if (window.autoBtn) {
+    window.autoBtn.setAttribute('aria-hidden', active ? 'false' : 'true');
+    window.autoBtn.tabIndex = active ? 0 : -1;
   }
 };
 
